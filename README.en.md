@@ -97,15 +97,15 @@ Sections of the HTML report the script writes to the desktop. All server names a
 
 **Overview and health findings**
 
-<img src="foto/rapor1.png" width="800" alt="Overview and health findings"/>
+<img src="foto/rapor11.png" width="800" alt="Overview and health findings"/>
 
 **Hardware comparison and DLP services**
 
-<img src="foto/rapor.png" width="800" alt="Hardware comparison and DLP services"/>
+<img src="foto/raporr.png" width="800" alt="Hardware comparison and DLP services"/>
 
 **Agent distribution and Detection Server status**
 
-<img src="foto/rapor2.png" width="800" alt="Agent version distribution and Detection Server status"/>
+<img src="foto/rapor22.png" width="800" alt="Agent version distribution and Detection Server status"/>
 
 <details>
 <summary><b>More screenshots (click to expand)</b></summary>
@@ -114,21 +114,21 @@ Sections of the HTML report the script writes to the desktop. All server names a
 
 **Detection Server error and warning events**
 
-<img src="foto/rapor3.png" width="800" alt="Error and warning events"/>
+<img src="foto/rapor33.png" width="800" alt="Error and warning events"/>
 
 **Incident count, distributions and policy summary**
 
-<img src="foto/rapor4.png" width="800" alt="Incident and policy summary"/>
+<img src="foto/rapor44.png" width="800" alt="Incident and policy summary"/>
 
-<img src="foto/rapor5.png" width="800" alt="Incident and policy summary"/>
+<img src="foto/rapor55.png" width="800" alt="Incident and policy summary"/>
 
 **Summary of Console Users and Roles**
 
-<img src="foto/rapor6.png" width="800" alt="Summary of Console Users and Roles"/>
+<img src="foto/rapor66.png" width="800" alt="Summary of Console Users and Roles"/>
 
 **Integration Status Summary**
 
-<img src="foto/rapor7.png" width="800" alt="Integration Status Summary"/>
+<img src="foto/rapor77.png" width="800" alt="Integration Status Summary"/>
 
 </details>
 
