@@ -120,6 +120,16 @@ Sections of the HTML report the script writes to the desktop. All server names a
 
 <img src="foto/rapor4.png" width="800" alt="Incident and policy summary"/>
 
+<img src="foto/rapor5.png" width="800" alt="Incident and policy summary"/>
+
+**Summary of Console Users and Roles**
+
+<img src="foto/rapor6.png" width="800" alt="Summary of Console Users and Roles"/>
+
+**Integration Status Summary**
+
+<img src="foto/rapor7.png" width="800" alt="Integration Status Summary"/>
+
 </details>
 
 ---
