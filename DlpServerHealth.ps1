@@ -1,4 +1,4 @@
-﻿#requires -Version 5.1
+#requires -Version 5.1
 
 <#
 .SYNOPSIS
@@ -65,6 +65,8 @@ param(
     [int]$IncidentTopCount = 10,
 
     [string]$CustomerName = '',
+
+    [switch]$SkipSyslogConnectivityTest,
 
     [switch]$SkipDatabaseCheck
 )
@@ -464,6 +466,36 @@ if ($hasDb) {
     }
 }
 
+$syslogRow = $null
+if ($reportData.PSObject.Properties['Syslog'] -and $null -ne $reportData.Syslog) {
+    $sl = $reportData.Syslog
+    switch ([string]$sl.Status) {
+        'Configured' {
+            $slConnText = switch ([string]$sl.Connectivity) {
+                'Reachable'       { 'Bağlantı: Erişilebilir (TCP bağlantısı kuruldu; mesaj iletimi doğrulanmaz)' }
+                'Unreachable'     { 'Bağlantı: Erişilemiyor (3 saniye içinde bağlantı kurulamadı)' }
+                'UdpUnverifiable' { 'Bağlantı: UDP olduğu için doğrulanamaz' }
+                default           { 'Bağlantı: Test edilmedi' }
+            }
+            $syslogRow = [pscustomobject]@{
+                Name   = 'Syslog (sistem olayları)'
+                State  = 'Var'
+                Detail = "$($sl.Protocol)://$($sl.SyslogHost):$($sl.Port); seviye: $($sl.LevelText); $slConnText"
+            }
+        }
+        'NotConfigured' {
+            $syslogRow = [pscustomobject]@{ Name = 'Syslog (sistem olayları)'; State = 'Yok'; Detail = 'Manager.properties içinde systemevent.syslog ayarı etkin değil' }
+        }
+        default {
+            $syslogRow = [pscustomobject]@{ Name = 'Syslog (sistem olayları)'; State = 'Bilinmiyor'; Detail = 'Manager.properties bulunamadı (script Enforce sunucusunda çalıştırılmamış olabilir)' }
+        }
+    }
+}
+$syslogStandaloneHtml = ''
+if ($null -ne $syslogRow) {
+    $syslogStandaloneHtml = "<section><h2>Syslog</h2><p style='margin:0'><strong>$(ConvertTo-HtmlSafe $syslogRow.State)</strong> - $(ConvertTo-HtmlSafe $syslogRow.Detail)</p></section>"
+}
+
 $oraclePatchHtml = ''
 $oracleRuCardsHtml = ''
 if ($hasDb) {
@@ -596,6 +628,7 @@ if ($hasDb) {
             [pscustomobject]@{ Name = 'OCR'; State = $(if ($ocrItems.Count -gt 0) { 'Var' } else { 'Yok' }); Detail = $ocrDetail },
             [pscustomobject]@{ Name = 'MIP (Microsoft Information Protection / AIP)'; State = $mipState; Detail = $mipDetail }
         )
+        if ($null -ne $syslogRow) { $integrationRows += $syslogRow }
         $integrationColumns = [ordered]@{
             'Entegrasyon' = 'Name'
             'Durum'       = 'State'
@@ -609,7 +642,7 @@ if ($hasDb) {
             $sslWarnHtml = "<p class='note-warn'>AD bağlantısı SSL kullanmıyor ($(ConvertTo-HtmlSafe (@($noSslItems | ForEach-Object { $_.Name }) -join ', '))). Şifrelenmemiş LDAP trafiği kimlik bilgilerini açığa çıkarabilir; LDAPS kullanılması önerilir.</p>"
         }
         $integrationHtml = "<section><h2>Entegrasyon Durumu</h2>$integrationTable$sslWarnHtml" +
-            "<p class='muted'>MIP durumu, Enforce'taki Azure Information Protection ve Information Centric Tagging yapılandırma kayıtlarına bakılarak belirlenir.</p></section>"
+            "<p class='muted'>MIP durumu, Enforce'taki Azure Information Protection ve Information Centric Tagging yapılandırma kayıtlarına bakılarak belirlenir. Syslog satırı, Enforce sunucusundaki Manager.properties dosyasındaki sistem olayı ayarını gösterir; 'Log to a Syslog Server' yanıt kuralları bu satırda kontrol edilmez.</p></section>"
     }
     else {
         $integrationHtml = "<section><h2>Entegrasyon Durumu</h2><p class='muted'>Entegrasyon bilgisi okunamadı.</p></section>"
@@ -863,7 +896,7 @@ if ($hasDb) {
 "@
 }
 else {
-  "<section><h2>Oracle / Veritabanı</h2><p class='muted'>Bu çalıştırmada veritabanı kontrolü atlanmış (-SkipDatabaseCheck).$(if ($licenseSectionHtml) { '</p>' + $licenseSectionHtml } else { '</p>' })</section>"
+  "<section><h2>Oracle / Veritabanı</h2><p class='muted'>Bu çalıştırmada veritabanı kontrolü atlanmış (-SkipDatabaseCheck).$(if ($licenseSectionHtml) { '</p>' + $licenseSectionHtml } else { '</p>' })</section>$syslogStandaloneHtml"
 }
 )
 
@@ -1129,6 +1162,129 @@ function Get-DlpLicenseInfo {
         elseif (@($sortedKeys | Where-Object { $_.Status -eq 'Expired' }).Count -gt 0) { 'Expired' }
         elseif (@($sortedKeys | Where-Object { $_.Status -eq 'Expiring soon' }).Count -gt 0) { 'Expiring soon' }
         else { 'OK' }
+
+    [pscustomobject]$info
+}
+
+function Get-DlpSyslogInfo {
+    param(
+        [string[]]$ManagerPropertiesPaths,
+        [switch]$SkipConnectivityTest
+    )
+
+    $info = [ordered]@{
+        Status       = 'FileNotFound'
+        File         = ''
+        Protocol     = ''
+        SyslogHost   = ''
+        Port         = ''
+        Level        = ''
+        LevelText    = ''
+        Format       = ''
+        Connectivity = 'NotTested'
+        OtherFiles   = @()
+        Error        = $null
+    }
+
+    $candidates = [System.Collections.Generic.List[object]]::new()
+    if ($ManagerPropertiesPaths) {
+        foreach ($path in $ManagerPropertiesPaths) {
+            if (Test-Path -LiteralPath $path) { [void]$candidates.Add((Get-Item -LiteralPath $path)) }
+        }
+    }
+    else {
+        $driveLetters = [System.Collections.Generic.List[string]]::new()
+        try {
+            foreach ($disk in @(Get-CimInstance -ClassName Win32_LogicalDisk -Filter 'DriveType=3')) { [void]$driveLetters.Add([string]$disk.DeviceID) }
+        }
+        catch { }
+        foreach ($fallbackDrive in @('C:', 'D:')) {
+            if ($driveLetters -notcontains $fallbackDrive) { [void]$driveLetters.Add($fallbackDrive) }
+        }
+        foreach ($drive in $driveLetters) {
+            foreach ($baseDirectory in @("$drive\Program Files\Symantec\DataLossPrevention\EnforceServer", "$drive\ProgramData\Symantec\DataLossPrevention\EnforceServer", "$drive\SymantecDLP")) {
+                if (Test-Path -LiteralPath $baseDirectory) {
+                    foreach ($file in @(Get-ChildItem -LiteralPath $baseDirectory -Filter 'Manager.properties' -File -Recurse -Depth 5 -ErrorAction SilentlyContinue)) {
+                        [void]$candidates.Add($file)
+                    }
+                }
+            }
+        }
+    }
+
+    if ($candidates.Count -eq 0) { return [pscustomobject]$info }
+
+    $ordered = @($candidates | Sort-Object -Property LastWriteTime -Descending)
+    $current = $ordered[0]
+    $info.File = $current.FullName
+    $info.OtherFiles = @($ordered | Select-Object -Skip 1 | ForEach-Object { $_.FullName })
+
+    $values = @{}
+    try {
+        foreach ($line in @(Get-Content -LiteralPath $current.FullName -ErrorAction Stop)) {
+            $trimmed = $line.Trim()
+            if ($trimmed.StartsWith('#') -or $trimmed.StartsWith('!') -or $trimmed -eq '') { continue }
+            $separator = $trimmed.IndexOf('=')
+            if ($separator -lt 1) { continue }
+            $key = $trimmed.Substring(0, $separator).Trim()
+            if ($key -like 'systemevent.syslog.*') { $values[$key] = $trimmed.Substring($separator + 1).Trim() }
+        }
+    }
+    catch {
+        $info.Error = "Manager.properties could not be read: $($_.Exception.Message)"
+        return [pscustomobject]$info
+    }
+
+    $syslogHost = if ($values.ContainsKey('systemevent.syslog.host')) { [string]$values['systemevent.syslog.host'] } else { '' }
+    if ([string]::IsNullOrWhiteSpace($syslogHost)) {
+        $info.Status = 'NotConfigured'
+        return [pscustomobject]$info
+    }
+
+    $protocol = if ($values.ContainsKey('systemevent.syslog.protocol') -and $values['systemevent.syslog.protocol']) { ([string]$values['systemevent.syslog.protocol']).ToLowerInvariant() } else { 'udp' }
+    $port = if ($values.ContainsKey('systemevent.syslog.port') -and $values['systemevent.syslog.port'] -match '^\d+$') { [int]$values['systemevent.syslog.port'] } else { 514 }
+    $level = if ($values.ContainsKey('systemevent.syslog.level') -and $values['systemevent.syslog.level'] -match '^\d+$') { [int]$values['systemevent.syslog.level'] } else { 3 }
+    $levelText = switch ($level) {
+        3 { 'SEVERE' }
+        4 { 'SEVERE + WARNING' }
+        5 { 'INFO + WARNING + SEVERE' }
+        default { "Level $level" }
+    }
+
+    $info.Status = 'Configured'
+    $info.Protocol = $protocol
+    $info.SyslogHost = $syslogHost
+    $info.Port = [string]$port
+    $info.Level = [string]$level
+    $info.LevelText = $levelText
+    $info.Format = $(if ($values.ContainsKey('systemevent.syslog.format')) { [string]$values['systemevent.syslog.format'] } else { '' })
+
+    if ($SkipConnectivityTest) {
+        $info.Connectivity = 'NotTested'
+    }
+    elseif ($protocol -eq 'udp') {
+        $info.Connectivity = 'UdpUnverifiable'
+    }
+    else {
+        $client = New-Object System.Net.Sockets.TcpClient
+        try {
+            $asyncResult = $client.BeginConnect($syslogHost, $port, $null, $null)
+            $connected = $asyncResult.AsyncWaitHandle.WaitOne(3000, $false)
+            if ($connected -and $client.Connected) {
+                $client.EndConnect($asyncResult)
+                $info.Connectivity = 'Reachable'
+            }
+            else {
+                $info.Connectivity = 'Unreachable'
+            }
+        }
+        catch {
+            $info.Connectivity = 'Unreachable'
+        }
+        finally {
+            $client.Close()
+        }
+    }
 
     [pscustomobject]$info
 }
@@ -2949,6 +3105,25 @@ if ($null -ne $databaseCheck -and $databaseCheck.DatabaseLogin -eq 'Successful' 
     }
 }
 
+$syslogInfo = Get-DlpSyslogInfo -SkipConnectivityTest:$SkipSyslogConnectivityTest
+if ($syslogInfo.Status -eq 'Configured') {
+    $syslogTarget = "{0}://{1}:{2}" -f $syslogInfo.Protocol, $syslogInfo.SyslogHost, $syslogInfo.Port
+    switch ($syslogInfo.Connectivity) {
+        'Unreachable' {
+            Add-Finding -List $findings -Category 'Integration' -Metric 'Syslog (system events)' -Value $syslogTarget -Status 'Warning' `
+                -Note "Syslog is configured (level: $($syslogInfo.LevelText)) but the TCP connection to the syslog server could not be established within 3 seconds."
+        }
+        'Reachable' {
+            Add-Finding -List $findings -Category 'Integration' -Metric 'Syslog (system events)' -Value $syslogTarget -Status 'Normal' `
+                -Note "Syslog is configured (level: $($syslogInfo.LevelText)) and the syslog server accepted a TCP connection. Message delivery itself is not verified."
+        }
+        default {
+            Add-Finding -List $findings -Category 'Integration' -Metric 'Syslog (system events)' -Value $syslogTarget -Status 'Normal' `
+                -Note "Syslog is configured (level: $($syslogInfo.LevelText)). Connectivity could not be verified for this protocol/setting."
+        }
+    }
+}
+
 $licenseInfo = Get-DlpLicenseInfo
 $licenseKeys = @($licenseInfo.LicenseKeys)
 $earliestExpiry = if ($licenseKeys.Count -gt 0) { (@($licenseKeys | ForEach-Object { $_.ExpiryDate } | Where-Object { $_ -ne '-' } | Sort-Object)[0]) } else { '-' }
@@ -3421,6 +3596,30 @@ else {
     if ($licenseInfo.Error) { Write-Host $licenseInfo.Error -ForegroundColor Red }
 }
 
+Write-Section -Title 'SYSLOG (SYSTEM EVENTS)'
+switch ($syslogInfo.Status) {
+    'Configured' {
+        Write-Host ("Configured : {0}://{1}:{2}" -f $syslogInfo.Protocol, $syslogInfo.SyslogHost, $syslogInfo.Port) -ForegroundColor Green
+        Write-Host ("Level      : {0} ({1})" -f $syslogInfo.Level, $syslogInfo.LevelText)
+        if ($syslogInfo.Format) { Write-Host ("Format     : {0}" -f $syslogInfo.Format) }
+        switch ($syslogInfo.Connectivity) {
+            'Reachable'       { Write-Host 'Connection : TCP connection to the syslog server succeeded (message delivery is not verified).' -ForegroundColor Green }
+            'Unreachable'     { Write-Host 'Connection : could not connect to the syslog server within 3 seconds.' -ForegroundColor Yellow }
+            'UdpUnverifiable' { Write-Host 'Connection : cannot be verified for UDP.' -ForegroundColor DarkGray }
+            default           { Write-Host 'Connection : not tested.' -ForegroundColor DarkGray }
+        }
+        Write-Host ("Source     : {0}" -f $syslogInfo.File) -ForegroundColor DarkGray
+    }
+    'NotConfigured' {
+        Write-Host 'Syslog for system events is not enabled in Manager.properties.' -ForegroundColor DarkYellow
+        Write-Host ("Source     : {0}" -f $syslogInfo.File) -ForegroundColor DarkGray
+    }
+    default {
+        Write-Host 'Manager.properties was not found (run this script on the Enforce Server).' -ForegroundColor DarkYellow
+    }
+}
+Write-Host "Note: 'Log to a Syslog Server' response rules are separate and are not checked here." -ForegroundColor DarkGray
+
 Write-Section -Title 'HEALTH FINDINGS AND NOTES'
 Write-StatusTable -Rows $findings
 
@@ -3479,6 +3678,7 @@ try {
         DatabaseChecked  = -not $SkipDatabaseCheck
         TierAssessment   = $tierAssessment
         License          = $licenseInfo
+        Syslog           = $syslogInfo
         IncidentLookbackDays = $IncidentLookbackDays
         HeartbeatStaleSeconds = $HeartbeatStaleSeconds
         SystemEventLookbackDays = $SystemEventLookbackDays
