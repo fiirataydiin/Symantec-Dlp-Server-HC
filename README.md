@@ -113,6 +113,16 @@ Script'in masaüstüne ürettiği HTML raporundan bölümler. Tüm sunucu adlar�
 
 <img src="foto/rapor4.png" width="800" alt="Incident ve politika özeti"/>
 
+<img src="foto/rapor5.png" width="800" alt="Incident ve politika özeti"/>
+
+**Konsol Kullanıcıları ve Rollerin özeti**
+
+<img src="foto/rapor6.png" width="800" alt="Konsol Kullanıcıları ve Rollerin özeti"/>
+
+**Entegrasyon Durumu özeti**
+
+<img src="foto/rapor7.png" width="800" alt="Entegrasyon Durumu özeti"/>
+
 </details>
 
 ---
