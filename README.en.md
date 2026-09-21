@@ -26,7 +26,7 @@
 </p>
 
 <p align="center">
-  <img src="foto/rapor1.png" width="800" alt="DLP Server Health sample report: overview and health findings"/>
+  <img src="foto/rapor11.png" width="800" alt="DLP Server Health sample report: overview and health findings"/>
 </p>
 
 <hr/>
