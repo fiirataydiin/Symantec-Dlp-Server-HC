@@ -658,6 +658,79 @@ if ($hasDb) {
     }
 }
 
+$agentAlertHtml = ''
+if ($hasDb) {
+    if ($db.PSObject.Properties['AgentAlertStatus'] -and $db.AgentAlertStatus -eq 'Successful') {
+        $alertItems = @(@($db.AgentAlerts) | Where-Object { $null -ne $_ })
+        $critCount = [int]$db.AgentAlertCriticalCount
+        $warnCount = [int]$db.AgentAlertWarningCount
+        $affectedCount = [int]$db.AgentAlertAffectedCount
+
+        $alertCards = (Get-KpiCardHtml -Label 'Critical Alerts' -Value ([string]$critCount) -Color $(if ($critCount -gt 0) { '#dc2626' } else { '#16a34a' })) +
+            (Get-KpiCardHtml -Label 'Warnings' -Value ([string]$warnCount) -Color $(if ($warnCount -gt 0) { '#d97706' } else { '#16a34a' })) +
+            (Get-KpiCardHtml -Label 'Affected Agents' -Value ([string]$affectedCount) -Color $(if ($affectedCount -gt 0) { '#d97706' } else { '#16a34a' }))
+
+        if ($alertItems.Count -gt 0) {
+            $typeItems = @()
+            if ($db.PSObject.Properties['AgentAlertTypes']) { $typeItems = @(@($db.AgentAlertTypes) | Where-Object { $null -ne $_ }) }
+            $typeRows = @($typeItems | ForEach-Object {
+                [pscustomobject]@{
+                    SeverityText = $(if ($_.Severity -eq 3) { 'Critical' } else { 'Warning' })
+                    Message       = $_.Message
+                    AffectedCount = $_.AffectedCount
+                    Severity      = $_.Severity
+                }
+            })
+            $typeColumns = [ordered]@{
+                'Severity'         = 'SeverityText'
+                'Alert Type'       = 'Message'
+                'Affected Agents'  = 'AffectedCount'
+            }
+            $typeTable = Get-GenericTableHtml -Items $typeRows -Columns $typeColumns -RowColorSelector {
+                param($i) if ([int]$i.Severity -eq 3) { '#dc2626' } else { '#d97706' }
+            }
+
+            $alertRows = @($alertItems | ForEach-Object {
+                [pscustomobject]@{
+                    AgentName  = $_.AgentName
+                    AgentIp    = $_.AgentIp
+                    SeverityText = $(if ($_.Severity -eq 3) { 'Critical' } else { 'Warning' })
+                    Message    = $_.Message
+                    Detail     = $_.Detail
+                    RecordTime = $_.RecordTime
+                    Severity   = $_.Severity
+                }
+            })
+            $alertColumns = [ordered]@{
+                'Agent'       = 'AgentName'
+                'IP'          = 'AgentIp'
+                'Severity'    = 'SeverityText'
+                'Alert'       = 'Message'
+                'Detail'      = 'Detail'
+                'Record Time' = 'RecordTime'
+            }
+            $alertTable = Get-GenericTableHtml -Items $alertRows -Columns $alertColumns -RowColorSelector {
+                param($i) if ([int]$i.Severity -eq 3) { '#dc2626' } else { '#d97706' }
+            }
+            $alertTruncNote = ''
+            if ([int]$db.AgentAlertCount -gt $alertItems.Count) {
+                $alertTruncNote = "<p class='muted'>The first $($alertItems.Count) alerts are listed (total: $($db.AgentAlertCount)).</p>"
+            }
+            $agentAlertHtml = "<section><h2>Agent Alerts</h2><div class='kpi-row'>$alertCards</div>" +
+                "<h3 style='font-size:14px;margin:16px 0 8px 0;color:#374151'>Summary by Alert Type</h3>$typeTable" +
+                "<details style='margin-top:16px'><summary style='cursor:pointer;font-weight:600;color:#374151;font-size:14px'>Per-Agent Detail ($($alertItems.Count) rows - click to expand)</summary>" +
+                "<div style='margin-top:12px'>$alertTable</div>$alertTruncNote</details>" +
+                "<p class='muted'>Corresponds to the Agent Overview alerts in the Enforce console (Not Reporting, Outdated, AD resolution failure, etc.). Only Critical/Warning conditions are listed; a single agent can have more than one alert.</p></section>"
+        }
+        else {
+            $agentAlertHtml = "<section><h2>Agent Alerts</h2><div class='kpi-row'>$alertCards</div><p class='note-ok'>No agent has a critical or warning condition.</p></section>"
+        }
+    }
+    else {
+        $agentAlertHtml = "<section><h2>Agent Alerts</h2><p class='muted'>Agent alert information could not be read.</p></section>"
+    }
+}
+
 $totalIncidentSectionHtml = ''
 if ($hasDb) {
     $incidentLimit = 1000000
@@ -833,6 +906,8 @@ if ($hasDb) {
       <div>Agent Deleted : $(ConvertTo-HtmlSafe ([string]$db.DeletedAgentCount))</div>
     </div>
   </section>
+
+  $agentAlertHtml
 
   <section>
     <h2>Detection Servers and Channels</h2>
@@ -1011,6 +1086,46 @@ function Get-DlpSystemEventMessage {
                 return 'No message was returned.'
             }
             return $SummaryKey
+        }
+    }
+}
+
+function Get-DlpAgentAlertMessage {
+    param([string]$StatusKey)
+
+    switch ($StatusKey) {
+        'agent_event.subcategory.lost_connection'                     { return 'Agent connection lost' }
+        'agent_event.subcategory.driver_down'                         { return 'Agent driver is down' }
+        'agent_event.subcategory.service_stopped'                     { return 'Agent service stopped' }
+        'agent_event.subcategory.service_unexpected_error'            { return 'Agent service unexpected error' }
+        'agent_event.subcategory.auth_failure'                        { return 'Agent authentication failure' }
+        'agent_event.subcategory.software_update_failure'             { return 'Agent software update failed' }
+        'agent_event.subcategory.software_update_timeout'             { return 'Agent software update timed out' }
+        'agent_event.subcategory.config_error'                        { return 'Agent configuration error' }
+        'agent_event.subcategory.agent_is_old'                        { return 'Agent is outdated' }
+        'agent_event.subcategory.agent_is_incompatible'                { return 'Agent version is incompatible' }
+        'agent_event.subcategory.detection_timeout'                   { return 'Detection timeout' }
+        'agent_event.subcategory.agent_store_corrupted'               { return 'Agent local store is corrupted' }
+        'agent_event.subcategory.file_evicted'                        { return 'File evicted from detection queue' }
+        'agent_event.subcategory.detection_queue_full'                { return 'Detection queue is full' }
+        'agent_event.subcategory.ad_usergroupresolution_failed'       { return 'Active Directory user/group resolution failed' }
+        'agent_event.subcategory.monitoring_needs_restart'            { return 'Agent monitoring needs a restart' }
+        'agent_event.subcategory.crash_dump_available'                { return 'Agent crash dump available' }
+        'agent_event.subcategory.reporting_status_down'               { return 'Agent is not reporting' }
+        'agent_event.subcategory.agent_group_attribute_status_error'  { return 'Agent group attribute error' }
+        'agent_event.subcategory.agent_group_conflict_status_present' { return 'Agent group conflict detected' }
+        'agent_event.subcategory.sip_hooking_disabled'                { return 'SIP hooking is disabled' }
+        'agent_event.subcategory.policy_update_failure'                { return 'Policy update failed' }
+        'agent_event.subcategory.live_update_failure'                  { return 'LiveUpdate failed' }
+        'agent_event.subcategory.outlook_addin_not_deployed'           { return 'Outlook add-in is not deployed' }
+        'agent_event.subcategory.outlook_addin_cert_not_deployed'      { return 'Outlook add-in certificate is not deployed' }
+        'agent_event.subcategory.outlook_addin_monitoring_not_working' { return 'Outlook add-in monitoring is not working' }
+        'agent_event.subcategory.endpoint_security_client_down'        { return 'Endpoint security client is down' }
+        default {
+            if ([string]::IsNullOrWhiteSpace($StatusKey)) { return 'Unknown agent alert' }
+            $clean = ($StatusKey -replace '^agent_event\.subcategory\.', '') -replace '_', ' '
+            if ($clean.Length -eq 0) { return $StatusKey }
+            (Get-Culture).TextInfo.ToTitleCase($clean)
         }
     }
 }
@@ -1552,6 +1667,14 @@ function Invoke-DlpDatabaseCheck {
         MipTenantCount       = 'N/A'
         MipIctCount          = 'N/A'
         MipLabelCount        = 'N/A'
+        AgentAlertStatus     = 'Not tested'
+        AgentAlertCount      = 'N/A'
+        AgentAlertCriticalCount = 'N/A'
+        AgentAlertWarningCount  = 'N/A'
+        AgentAlertAffectedCount = 'N/A'
+        AgentAlertTypeStatus = 'Not tested'
+        AgentAlertTypes      = @()
+        AgentAlerts          = @()
         PendingDeleteStatus = 'Not tested'
         PendingDeleteCount  = 'N/A'
         PendingDeleteError  = $null
@@ -1611,6 +1734,9 @@ function Invoke-DlpDatabaseCheck {
     $consoleAccessFile = Join-Path $sqlTempDirectory 'dlp_console_access.txt'
     $integrationFile = Join-Path $sqlTempDirectory 'dlp_integrations.txt'
     $mipFile = Join-Path $sqlTempDirectory 'dlp_mip.txt'
+    $agentAlertCountFile = Join-Path $sqlTempDirectory 'dlp_agent_alert_count.txt'
+    $agentAlertTypeFile = Join-Path $sqlTempDirectory 'dlp_agent_alert_type.txt'
+    $agentAlertListFile = Join-Path $sqlTempDirectory 'dlp_agent_alert_list.txt'
 
     $sqlContent = @"
 SET HEADING OFF
@@ -2095,6 +2221,56 @@ SELECT
 FROM dual;
 SPOOL OFF
 
+SPOOL $agentAlertCountFile
+SELECT
+    COUNT(*) || '|' ||
+    SUM(CASE WHEN cs.severity = 3 THEN 1 ELSE 0 END) || '|' ||
+    SUM(CASE WHEN cs.severity = 4 THEN 1 ELSE 0 END) || '|' ||
+    COUNT(DISTINCT r.agentid)
+FROM agentstaterecord r
+JOIN agent a ON a.agentid = r.agentid
+JOIN agenteventcategorystatus cs
+    ON cs.categorystatusid = r.categorystatusid AND cs.categoryid = r.categoryid
+WHERE NVL(r.isdefault, 0) = 0
+  AND NVL(a.isdeleted, 0) = 0
+  AND cs.severity < 5;
+SPOOL OFF
+
+SPOOL $agentAlertTypeFile
+SELECT
+    cs.severity || '|' ||
+    REPLACE(cs.categorystatusname, '|', '/') || '|' ||
+    COUNT(DISTINCT r.agentid)
+FROM agentstaterecord r
+JOIN agent a ON a.agentid = r.agentid
+JOIN agenteventcategorystatus cs
+    ON cs.categorystatusid = r.categorystatusid AND cs.categoryid = r.categoryid
+WHERE NVL(r.isdefault, 0) = 0
+  AND NVL(a.isdeleted, 0) = 0
+  AND cs.severity < 5
+GROUP BY cs.severity, cs.categorystatusname
+ORDER BY cs.severity ASC, COUNT(DISTINCT r.agentid) DESC;
+SPOOL OFF
+
+SPOOL $agentAlertListFile
+SELECT
+    REPLACE(a.agentname, '|', '/') || '|' ||
+    REPLACE(NVL(a.agentipaddress, '-'), '|', '/') || '|' ||
+    cs.severity || '|' ||
+    REPLACE(cs.categorystatusname, '|', '/') || '|' ||
+    TO_CHAR(r.recorddate, 'YYYY-MM-DD HH24:MI') || '|' ||
+    REPLACE(REPLACE(REPLACE(NVL(r.extendedvalue, '-'), '|', '/'), CHR(10), ' '), CHR(13), ' ')
+FROM agentstaterecord r
+JOIN agent a ON a.agentid = r.agentid
+JOIN agenteventcategorystatus cs
+    ON cs.categorystatusid = r.categorystatusid AND cs.categoryid = r.categoryid
+WHERE NVL(r.isdefault, 0) = 0
+  AND NVL(a.isdeleted, 0) = 0
+  AND cs.severity < 5
+ORDER BY cs.severity ASC, a.agentname ASC
+FETCH FIRST 5000 ROWS ONLY;
+SPOOL OFF
+
 EXIT SUCCESS
 "@
 
@@ -2148,6 +2324,9 @@ EXIT SUCCESS
         Remove-Item -Path $consoleAccessFile -Force -ErrorAction SilentlyContinue
         Remove-Item -Path $integrationFile -Force -ErrorAction SilentlyContinue
         Remove-Item -Path $mipFile -Force -ErrorAction SilentlyContinue
+        Remove-Item -Path $agentAlertCountFile -Force -ErrorAction SilentlyContinue
+        Remove-Item -Path $agentAlertTypeFile -Force -ErrorAction SilentlyContinue
+        Remove-Item -Path $agentAlertListFile -Force -ErrorAction SilentlyContinue
 
         $securePassword = Read-Host -Prompt "Oracle password for $UserName" -AsSecureString
         $passwordPointer = [IntPtr]::Zero
@@ -2797,6 +2976,62 @@ EXIT SUCCESS
                 }
             }
 
+            $agentAlertTypes = [System.Collections.Generic.List[object]]::new()
+            if (Test-Path -LiteralPath $agentAlertTypeFile) {
+                foreach ($agentAlertTypeLine in (Get-Content -LiteralPath $agentAlertTypeFile -ErrorAction SilentlyContinue)) {
+                    if ($agentAlertTypeLine -match 'ORA-\d+') { continue }
+                    $agentAlertTypeParts = $agentAlertTypeLine.Trim() -split '\|'
+                    if ($agentAlertTypeParts.Count -eq 3 -and $agentAlertTypeParts[0] -match '^\d+$' -and $agentAlertTypeParts[2] -match '^\d+$') {
+                        $agentAlertTypeKey = $agentAlertTypeParts[1].Trim()
+                        [void]$agentAlertTypes.Add([pscustomobject]@{
+                            Severity     = [int]$agentAlertTypeParts[0]
+                            Message      = Get-DlpAgentAlertMessage -StatusKey $agentAlertTypeKey
+                            StatusKey    = $agentAlertTypeKey
+                            AffectedCount = [int]$agentAlertTypeParts[2]
+                        })
+                    }
+                }
+                $result.AgentAlertTypeStatus = 'Successful'
+            }
+            $result.AgentAlertTypes = @($agentAlertTypes)
+
+            if (Test-Path -LiteralPath $agentAlertCountFile) {
+                $agentAlertCountLine = @(Get-Content -LiteralPath $agentAlertCountFile -ErrorAction SilentlyContinue) |
+                    Where-Object { $_.Trim() -match '^\d+\|\d+\|\d+\|\d+$' } | Select-Object -First 1
+                if ($null -ne $agentAlertCountLine) {
+                    $agentAlertCountParts = $agentAlertCountLine.Trim() -split '\|'
+                    $result.AgentAlertCount = $agentAlertCountParts[0]
+                    $result.AgentAlertCriticalCount = $agentAlertCountParts[1]
+                    $result.AgentAlertWarningCount = $agentAlertCountParts[2]
+                    $result.AgentAlertAffectedCount = $agentAlertCountParts[3]
+                    $result.AgentAlertStatus = 'Successful'
+                }
+                else {
+                    $result.AgentAlertStatus = 'Failed'
+                }
+            }
+
+            $agentAlerts = [System.Collections.Generic.List[object]]::new()
+            if (Test-Path -LiteralPath $agentAlertListFile) {
+                foreach ($agentAlertLine in (Get-Content -LiteralPath $agentAlertListFile -ErrorAction SilentlyContinue)) {
+                    if ($agentAlertLine -match 'ORA-\d+') { continue }
+                    $agentAlertParts = $agentAlertLine.Trim() -split '\|'
+                    if ($agentAlertParts.Count -eq 6 -and $agentAlertParts[2] -match '^\d+$') {
+                        $agentAlertStatusKey = $agentAlertParts[3].Trim()
+                        [void]$agentAlerts.Add([pscustomobject]@{
+                            AgentName  = $agentAlertParts[0].Trim()
+                            AgentIp    = $agentAlertParts[1].Trim()
+                            Severity   = [int]$agentAlertParts[2]
+                            Message    = Get-DlpAgentAlertMessage -StatusKey $agentAlertStatusKey
+                            StatusKey  = $agentAlertStatusKey
+                            RecordTime = $agentAlertParts[4].Trim()
+                            Detail     = $agentAlertParts[5].Trim()
+                        })
+                    }
+                }
+            }
+            $result.AgentAlerts = @($agentAlerts)
+
             if (Test-Path -LiteralPath $pendingDeleteFile) {
                 $pendingDeleteLines = @(Get-Content -LiteralPath $pendingDeleteFile -ErrorAction SilentlyContinue)
                 $pendingDeleteValue = $pendingDeleteLines | Where-Object { $_.Trim() -match '^\d+$' } | Select-Object -First 1
@@ -2848,6 +3083,9 @@ EXIT SUCCESS
         Remove-Item -Path $consoleAccessFile -Force -ErrorAction SilentlyContinue
         Remove-Item -Path $integrationFile -Force -ErrorAction SilentlyContinue
         Remove-Item -Path $mipFile -Force -ErrorAction SilentlyContinue
+        Remove-Item -Path $agentAlertCountFile -Force -ErrorAction SilentlyContinue
+        Remove-Item -Path $agentAlertTypeFile -Force -ErrorAction SilentlyContinue
+        Remove-Item -Path $agentAlertListFile -Force -ErrorAction SilentlyContinue
     }
 
     [pscustomobject]$result
@@ -3583,6 +3821,33 @@ elseif ($databaseCheck) {
         Write-Host 'Integration information could not be read.' -ForegroundColor Red
     }
 
+    Write-Section -Title 'AGENT ALERTS'
+    if ($databaseCheck.AgentAlertStatus -eq 'Successful') {
+        Write-Host ("Critical : {0} | Warning : {1} | Affected agents : {2}" -f $databaseCheck.AgentAlertCriticalCount, $databaseCheck.AgentAlertWarningCount, $databaseCheck.AgentAlertAffectedCount) -ForegroundColor Cyan
+        if (@($databaseCheck.AgentAlertTypes).Count -gt 0) {
+            Write-Host ''
+            Write-Host 'By alert type:' -ForegroundColor White
+            $databaseCheck.AgentAlertTypes |
+                Select-Object @{ Name = 'Severity'; Expression = { if ($_.Severity -eq 3) { 'Critical' } else { 'Warning' } } }, Message, AffectedCount |
+                Format-Table -AutoSize | Out-Host
+        }
+        if (@($databaseCheck.AgentAlerts).Count -gt 0) {
+            Write-Host 'Per-agent detail:' -ForegroundColor White
+            $databaseCheck.AgentAlerts |
+                Select-Object AgentName, AgentIp, @{ Name = 'Severity'; Expression = { if ($_.Severity -eq 3) { 'Critical' } else { 'Warning' } } }, Message, Detail, RecordTime |
+                Format-Table -AutoSize | Out-Host
+            if ([int]$databaseCheck.AgentAlertCount -gt @($databaseCheck.AgentAlerts).Count) {
+                Write-Host ("Showing the first {0} alerts (total {1})." -f @($databaseCheck.AgentAlerts).Count, $databaseCheck.AgentAlertCount) -ForegroundColor DarkGray
+            }
+        }
+        else {
+            Write-Host 'No agent has a critical or warning condition.' -ForegroundColor Green
+        }
+        Write-Host 'Note: corresponds to the Agent Overview alerts in the Enforce console (Not Reporting, Outdated, AD resolution failure, etc.).' -ForegroundColor DarkGray
+    }
+    else {
+        Write-Host 'Agent alert information could not be read.' -ForegroundColor Red
+    }
 }
 
 Write-Section -Title 'DLP LICENSE'
