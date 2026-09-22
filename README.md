@@ -8,6 +8,10 @@
 </p>
 
 <p align="center">
+  <a href="README.en.md">🇬🇧 English</a> | 🇹🇷 Türkçe
+</p>
+
+<p align="center">
   <a href="#-hızlı-başlangıç">Hızlı Başlangıç</a> |
   <a href="#-örnek-rapor-çıktısı">Örnek Rapor</a> |
   <a href="#-neleri-kontrol-eder">Neleri Kontrol Eder</a> |
@@ -18,7 +22,7 @@
   <img src="https://img.shields.io/badge/PowerShell-5.1%2B-5391FE?logo=powershell&logoColor=white" alt="PowerShell 5.1+"/>
   <img src="https://img.shields.io/badge/Platform-Windows-0078D6?logo=windows&logoColor=white" alt="Windows"/>
   <img src="https://img.shields.io/badge/Mod-Salt--okunur-2ea44f" alt="Salt-okunur"/>
-  <img src="https://img.shields.io/badge/Dış%20ağ%20çağrısı-Yok-2ea44f" alt="Dış ağ çağrısı yok"/>
+  <img src="https://img.shields.io/badge/Veri%20gönderimi-Yok-2ea44f" alt="Veri gönderimi yok"/>
 </p>
 
 <p align="center">
@@ -51,7 +55,7 @@ Hazırlayan: **FIRAT AYDIN**
 |---|---|
 | **Ne yapar?** | DLP sunucusunun ve Oracle veritabanının durumunu okur, raporlar |
 | **Neyi değiştirir?** | **Hiçbir şeyi.** Sadece okur (`SELECT`) |
-| **Çıktısı ne?** | Konsola özet + masaüstüne grafikli HTML rapor |
+| **Çıktısı ne?** | Konsola özet + masaüstüne grafikli HTML rapor (Edge/Chrome varsa aynı isimle bir PDF kopyası da otomatik oluşur) |
 | **Nerede çalışır?** | Enforce Server (Windows) |
 | **Ne kadar sürer?** | Birkaç dakika |
 
@@ -77,10 +81,13 @@ Hazırlayan: **FIRAT AYDIN**
 | Oracle kullanıcı ve servis adı | `protect` / `protect` |
 | Oracle parolası *(yazarken görünmez)* | `********` |
 
-**4.** Bitince masaüstünde `<SunucuAdı>_DLP_HC_<tarih>.html` dosyasını açın. ✅
+**4.** Bitince masaüstünde `<MüşteriAdı>_DLPHC_<tarih>.html` dosyasını açın. Sistemde Microsoft Edge veya Google Chrome varsa aynı isimle bir `.pdf` kopyası da otomatik oluşur. ✅
 
 > [!TIP]
 > Veritabanına bağlanmadan sadece sunucu kontrolü yapmak için: `.\DlpServerHealth.ps1 -SkipDatabaseCheck`
+
+> [!TIP]
+> PDF raporu, HTML'deki agent bazında ayrıntılı listeyi içermez — sadece kritik/uyarı özetini gösterir. Tam liste her zaman HTML raporunda mevcuttur. Edge veya Chrome bulunamazsa PDF adımı atlanır, HTML rapor yine de üretilir.
 
 ---
 
@@ -109,19 +116,27 @@ Script'in masaüstüne ürettiği HTML raporundan bölümler. Tüm sunucu adlar�
 
 <img src="foto/rapor3.png" width="800" alt="Hata ve uyarı olayları"/>
 
+**Agent uyarıları (büyük ortamlar için katlanır liste)**
+
+<img src="foto/rapor8.png" width="800" alt="Agent uyarıları: uyarı tipine göre özet ve katlanır ayrıntılı liste"/>
+
 **Incident sayısı, dağılımlar ve politika özeti**
 
 <img src="foto/rapor4.png" width="800" alt="Incident ve politika özeti"/>
 
-<img src="foto/rapor5.png" width="800" alt="Incident ve politika özeti"/>
+**En çok ihlal edilen politikalar, göndericiler ve kullanıcılar**
 
-**Konsol Kullanıcıları ve Rollerin özeti**
+<img src="foto/rapor5.png" width="800" alt="En çok ihlal edilen politikalar, network göndericileri ve endpoint kullanıcıları (son 30 gün)"/>
 
-<img src="foto/rapor6.png" width="800" alt="Konsol Kullanıcıları ve Rollerin özeti"/>
+**Konsol kullanıcıları ve roller**
 
-**Entegrasyon Durumu özeti**
+<img src="foto/rapor6.png" width="800" alt="Enforce konsol kullanıcıları, durumları ve roller"/>
 
-<img src="foto/rapor7.png" width="800" alt="Entegrasyon Durumu özeti"/>
+**Entegrasyon durumu (AD, OCR, MIP, Syslog)**
+
+<img src="foto/rapor7.png" width="800" alt="Entegrasyon durumu: Active Directory, OCR, MIP ve Syslog"/>
+
+> Aynı rapor, HTML'nin yanı sıra otomatik olarak PDF olarak da oluşturulur (bkz. [Hızlı Başlangıç](#-hızlı-başlangıç)).
 
 </details>
 
@@ -142,6 +157,9 @@ Script'in masaüstüne ürettiği HTML raporundan bölümler. Tüm sunucu adlar�
 > Politika adları, sunucu adları, gönderen / kullanıcı bilgileri ve incident sayıları rapora girer. Paylaşmadan önce gözden geçirin.
 
 > [!NOTE]
+> **Syslog bağlantı testi.** Script, `Manager.properties` içinde syslog etkinse o sunucuya **yalnızca bir TCP bağlantısı açmayı dener** (3 saniye zaman aşımı, hiçbir veri gönderilmez). Bunu istemiyorsanız `-SkipSyslogConnectivityTest` kullanın. UDP için test yapılamaz.
+
+> [!NOTE]
 > **Sürüm farkı olabilir.** Sorgular belirli DLP şema sürümlerine göre hazırlandı. Farklı sürümde bazı bölümler boş gelebilir. İlk çalıştırmada sonuçları Enforce konsoluyla karşılaştırın.
 
 ---
@@ -155,11 +173,12 @@ Script'in masaüstüne ürettiği HTML raporundan bölümler. Tüm sunucu adlar�
 | 🔑 **Lisans** | Geçerli / dolmak üzere / dolmuş |
 | 📡 **Detection Server** | Sürüm, Running / Unknown durumu |
 | 💻 **Endpoint agent** | Sayı ve sürüm dağılımı |
+| 🚨 **Agent uyarıları** | Not Reporting, Outdated, AD çözümleme hatası vb. (Enforce Agent Overview); büyük ortamlarda katlanır liste |
 | 🗄️ **Oracle** | Sürüm, tablespace doluluğu |
 | 📊 **Incident** | Türe, sunucuya, politikaya, gönderene, kullanıcıya göre Top 10; silinmeyi bekleyenler |
 | 📋 **Politikalar** | Toplam, gruplar, hiç incident üretmeyenler, pattern özeti |
 | 👥 **Konsol erişimi** | Kullanıcılar, roller, pasif hesaplar |
-| 🔗 **Entegrasyonlar** | AD, OCR, MIP |
+| 🔗 **Entegrasyonlar** | AD, OCR, MIP, sistem olayları için Syslog ayarı ve erişilebilirliği |
 
 ---
 
@@ -169,7 +188,7 @@ Script'in masaüstüne ürettiği HTML raporundan bölümler. Tüm sunucu adlar�
 |---|---|
 | Oracle'a yalnızca `SELECT` gönderir | `INSERT` / `UPDATE` / `DELETE` / `DROP` çalıştırmaz |
 | Parolayı maskeli ister, kullanım sonrası bellekten siler | Parolayı diske yazmaz |
-| Verileri yerel makinede tutar | Dışarıya hiçbir ağ çağrısı yapmaz |
+| Verileri yerel makinede tutar | Hiçbir veriyi dışarıya göndermez (internet, bulut, e-posta yok) |
 | Geçici dosyaları iş bitince siler | Konsol kullanıcılarının parola alanlarını okumaz |
 | Kaynak kodu tamamen açıktır | Gizli / gömülü bir şey içermez |
 
@@ -200,6 +219,7 @@ flowchart LR
 - Enforce Server üzerinde `sqlplus.exe` (`PATH` içinde)
 - Enforce → Oracle ağ erişimi (varsayılan port `1521`)
 - Tercihen **sadece okuma yetkili** bir Oracle kullanıcısı
+- *(İsteğe bağlı)* PDF çıktısı için Microsoft Edge veya Google Chrome — yoksa sadece HTML üretilir, script hata vermez
 
 ---
 
@@ -238,6 +258,7 @@ flowchart LR
 | `-MemoryWarningUsedPercent` / `-MemoryCriticalUsedPercent` | `80` / `90` | RAM eşikleri |
 | `-DiskWarningFreePercent` / `-DiskCriticalFreePercent` | `20` / `10` | Boş disk eşikleri |
 | `-SkipDatabaseCheck` | kapalı | Oracle kontrollerini atlar |
+| `-SkipSyslogConnectivityTest` | kapalı | Syslog sunucusuna yapılan TCP bağlantı testini atlar |
 
 </details>
 
@@ -251,6 +272,7 @@ flowchart LR
 - **Two-tier donanım karşılaştırması** hesaplanmıştır. Broadcom two-tier için ayrı bir tablo yayınlamadığından Enforce ve Oracle önerileri toplanır. Raporda bu belirtilir.
 - **Silinmiş incident'ler** veritabanından sayılamaz. Rapor aktif ve silinmeyi bekleyen incident'leri gösterir.
 - **Tablespace doluluğu** autoextend / `MAXBYTES` sınırını hesaba katmaz. Autoextend açık bir tablespace olduğundan daha kritik görünebilir.
+- **PDF raporu**, HTML'deki agent bazında ayrıntılı listeyi içermez (sadece özet KPI'lar ve uyarı tipine göre tablo). Tam liste her zaman HTML raporunda mevcuttur. Edge/Chrome bulunamazsa PDF adımı sessizce atlanır.
 - Yalnızca **Windows Enforce Server** için tasarlanmıştır. Tüm DLP sürümleri ve mimari varyasyonları test edilmemiştir.
 
 </details>
