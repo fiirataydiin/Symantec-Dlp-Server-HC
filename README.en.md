@@ -26,7 +26,7 @@
 </p>
 
 <p align="center">
-  <img src="foto/rapor11.png" width="800" alt="DLP Server Health sample report: overview and health findings"/>
+  <img src="foto/rapor1.png" width="800" alt="DLP Server Health sample report: overview and health findings"/>
 </p>
 
 <hr/>
@@ -58,7 +58,7 @@ Author: **FIRAT AYDIN**
 |---|---|
 | **What does it do?** | Reads and reports the state of the DLP server and its Oracle database |
 | **What does it change?** | **Nothing.** Read-only (`SELECT`) |
-| **Output** | Console summary + graphical HTML report on the desktop |
+| **Output** | Console summary + graphical HTML report on the desktop (plus a matching PDF, auto-generated if Edge/Chrome is present) |
 | **Where does it run?** | Enforce Server (Windows) |
 | **How long does it take?** | A few minutes |
 
@@ -84,10 +84,13 @@ Author: **FIRAT AYDIN**
 | Oracle user and service name | `protect` / `protect` |
 | Oracle password *(input is hidden)* | `********` |
 
-**4.** When it finishes, open `<ServerName>_DLP_HC_<date>.html` on your desktop. ✅
+**4.** When it finishes, open `<CustomerName>_DLPHC_<date>.html` on your desktop. If Microsoft Edge or Google Chrome is present, a matching `.pdf` copy is generated automatically. ✅
 
 > [!TIP]
 > To run only the server checks without connecting to the database: `.\DlpServerHealth.ps1 -SkipDatabaseCheck`
+
+> [!TIP]
+> The PDF report does not include the per-agent detail list from the HTML report — only the critical/warning summary. The full list is always available in the HTML report. If Edge or Chrome is not found, the PDF step is skipped and the HTML report is still generated.
 
 ---
 
@@ -97,15 +100,15 @@ Sections of the HTML report the script writes to the desktop. All server names a
 
 **Overview and health findings**
 
-<img src="foto/rapor11.png" width="800" alt="Overview and health findings"/>
+<img src="foto/rapor1.png" width="800" alt="Overview and health findings"/>
 
 **Hardware comparison and DLP services**
 
-<img src="foto/raporr.png" width="800" alt="Hardware comparison and DLP services"/>
+<img src="foto/rapor.png" width="800" alt="Hardware comparison and DLP services"/>
 
 **Agent distribution and Detection Server status**
 
-<img src="foto/rapor22.png" width="800" alt="Agent version distribution and Detection Server status"/>
+<img src="foto/rapor2.png" width="800" alt="Agent version distribution and Detection Server status"/>
 
 <details>
 <summary><b>More screenshots (click to expand)</b></summary>
@@ -114,21 +117,29 @@ Sections of the HTML report the script writes to the desktop. All server names a
 
 **Detection Server error and warning events**
 
-<img src="foto/rapor33.png" width="800" alt="Error and warning events"/>
+<img src="foto/rapor3.png" width="800" alt="Error and warning events"/>
+
+**Agent alerts (collapsible list for large environments)**
+
+<img src="foto/rapor88.png" width="800" alt="Agent alerts: summary by alert type and collapsible detail list"/>
 
 **Incident count, distributions and policy summary**
 
-<img src="foto/rapor44.png" width="800" alt="Incident and policy summary"/>
+<img src="foto/rapor4.png" width="800" alt="Incident and policy summary"/>
 
-<img src="foto/rapor55.png" width="800" alt="Incident and policy summary"/>
+**Most violated policies, senders and users**
 
-**Summary of Console Users and Roles**
+<img src="foto/rapor5.png" width="800" alt="Most violated policies, network senders and endpoint users (last 30 days)"/>
 
-<img src="foto/rapor66.png" width="800" alt="Summary of Console Users and Roles"/>
+**Console users and roles**
 
-**Integration Status Summary**
+<img src="foto/rapor6.png" width="800" alt="Enforce console users, their status and roles"/>
 
-<img src="foto/rapor77.png" width="800" alt="Integration Status Summary"/>
+**Integration status (AD, OCR, MIP, Syslog)**
+
+<img src="foto/rapor7.png" width="800" alt="Integration status: Active Directory, OCR, MIP and Syslog"/>
+
+> The same report is also generated automatically as a PDF alongside the HTML file (see [Quick start](#-quick-start)).
 
 </details>
 
@@ -165,6 +176,7 @@ Sections of the HTML report the script writes to the desktop. All server names a
 | 🔑 **License** | Valid / expiring soon / expired |
 | 📡 **Detection Server** | Version, Running / Unknown state |
 | 💻 **Endpoint agents** | Count and version distribution |
+| 🚨 **Agent alerts** | Not Reporting, Outdated, AD resolution failure, etc. (Enforce Agent Overview); collapsible list for large environments |
 | 🗄️ **Oracle** | Version, tablespace usage |
 | 📊 **Incidents** | Top 10 by type, server, policy, sender, user; incidents pending deletion |
 | 📋 **Policies** | Total, groups, policies with no incidents, pattern summary |
@@ -210,6 +222,7 @@ flowchart LR
 - `sqlplus.exe` on the Enforce Server (in `PATH`)
 - Network access from Enforce to Oracle (default port `1521`)
 - Preferably an Oracle user with **read-only** privileges
+- *(Optional)* Microsoft Edge or Google Chrome for the PDF output — if neither is present, only the HTML report is generated, with no error
 
 ---
 
@@ -262,6 +275,7 @@ flowchart LR
 - **The two-tier hardware comparison** is calculated. Broadcom does not publish a separate table for two-tier, so the Enforce and Oracle recommendations are added together. The report states this.
 - **Deleted incidents** cannot be counted from the database. The report shows active incidents and those pending deletion.
 - **Tablespace usage** does not take autoextend / `MAXBYTES` limits into account. A tablespace with autoextend enabled may look more critical than it is.
+- **The PDF report** does not include the HTML report's per-agent detail list (only summary KPIs and the by-alert-type table). The full list is always available in the HTML report. If Edge/Chrome is not found, the PDF step is silently skipped.
 - Designed only for a **Windows Enforce Server**. Not all DLP versions and architecture variations have been tested.
 
 </details>
