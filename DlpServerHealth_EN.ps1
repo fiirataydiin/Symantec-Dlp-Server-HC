@@ -1,4 +1,4 @@
-﻿#requires -Version 5.1
+#requires -Version 5.1
 
 <#
 .SYNOPSIS
@@ -86,6 +86,15 @@ function ConvertTo-HtmlSafe {
     param([string]$Text)
     if ($null -eq $Text -or $Text -eq '') { return '' }
     $Text.Replace('&', '&amp;').Replace('<', '&lt;').Replace('>', '&gt;').Replace('"', '&quot;')
+}
+
+function Get-SumOrZero {
+    param([object[]]$InputObject, [string]$Property)
+    $items = @($InputObject | Where-Object { $null -ne $_ })
+    if ($items.Count -eq 0) { return 0 }
+    $measured = $items | Measure-Object -Property $Property -Sum
+    if ($null -eq $measured) { return 0 }
+    return $measured.Sum
 }
 
 function Get-StatusColor {
@@ -654,7 +663,7 @@ if ($hasDb) {
     $incidentLimit = 1000000
     $totalIncidents = $null
     if ($db.IncidentTypeStatus -eq 'Successful') {
-        $totalIncidents = [long](@($db.IncidentsByType) | Measure-Object -Property Count -Sum).Sum
+        $totalIncidents = [long](Get-SumOrZero -InputObject @($db.IncidentsByType) -Property 'Count')
     }
     elseif ($db.IncidentTypeStatus -eq 'No incidents') {
         $totalIncidents = 0
@@ -3269,8 +3278,7 @@ elseif ($databaseCheck) {
             Format-Table -AutoSize |
             Out-Host
 
-        $versionedAgentCount = [int](($databaseCheck.AgentVersions |
-            Measure-Object -Property Count -Sum).Sum)
+        $versionedAgentCount = [int](Get-SumOrZero -InputObject @($databaseCheck.AgentVersions) -Property 'Count')
         Write-Host ("DistinctAgentVersionCount : {0}" -f @($databaseCheck.AgentVersions).Count) -ForegroundColor Cyan
         Write-Host ("InstalledAgentCount       : {0}" -f $versionedAgentCount) -ForegroundColor Cyan
 
@@ -3337,8 +3345,8 @@ elseif ($databaseCheck) {
             Write-Host $eventText -ForegroundColor $eventColor
         }
 
-        $errorEventCount = [int](@($databaseCheck.SystemEvents | Where-Object Type -eq 'Error') | Measure-Object -Property Count -Sum).Sum
-        $warningEventCount = [int](@($databaseCheck.SystemEvents | Where-Object Type -eq 'Warning') | Measure-Object -Property Count -Sum).Sum
+        $errorEventCount = [int](Get-SumOrZero -InputObject @($databaseCheck.SystemEvents | Where-Object Type -eq 'Error') -Property 'Count')
+        $warningEventCount = [int](Get-SumOrZero -InputObject @($databaseCheck.SystemEvents | Where-Object Type -eq 'Warning') -Property 'Count')
         Write-Host ''
         Write-Host ("ErrorEventCount   : {0}" -f $errorEventCount) -ForegroundColor Red
         Write-Host ("WarningEventCount : {0}" -f $warningEventCount) -ForegroundColor Yellow
@@ -3413,7 +3421,7 @@ elseif ($databaseCheck) {
     if ($databaseCheck.IncidentTypeStatus -eq 'Successful' -or $databaseCheck.IncidentTypeStatus -eq 'No incidents') {
         $consoleTotalIncidents = 0
         if ($databaseCheck.IncidentTypeStatus -eq 'Successful') {
-            $consoleTotalIncidents = [long](@($databaseCheck.IncidentsByType) | Measure-Object -Property Count -Sum).Sum
+            $consoleTotalIncidents = [long](Get-SumOrZero -InputObject @($databaseCheck.IncidentsByType) -Property 'Count')
         }
         $consoleTotalText = $consoleTotalIncidents.ToString('N0', [System.Globalization.CultureInfo]::GetCultureInfo('en-US'))
         Write-Host ("TotalIncidentCount : {0}" -f $consoleTotalText) -ForegroundColor Cyan
@@ -3437,7 +3445,7 @@ elseif ($databaseCheck) {
     Write-Section -Title 'INCIDENT TYPE DISTRIBUTION'
     if ($databaseCheck.IncidentTypeStatus -eq 'Successful') {
         $databaseCheck.IncidentsByType | Select-Object Type, Count | Format-Table -AutoSize | Out-Host
-        $totalIncidentCount = [long](($databaseCheck.IncidentsByType | Measure-Object -Property Count -Sum).Sum)
+        $totalIncidentCount = [long](Get-SumOrZero -InputObject @($databaseCheck.IncidentsByType) -Property 'Count')
         Write-Host ("TotalIncidentCount : {0}" -f $totalIncidentCount) -ForegroundColor Cyan
     }
     elseif ($databaseCheck.IncidentTypeStatus -eq 'No incidents') {
@@ -3688,7 +3696,13 @@ try {
     $reportForHtml = $reportData | ConvertTo-Json -Depth 10 | ConvertFrom-Json
     $htmlContent = New-DlpHtmlReport -ReportData $reportForHtml -CustomerName $CustomerName
 
-    $reportFileName = "{0}_DLP_HC_{1:yyyyMMdd_HHmmss}.html" -f $env:COMPUTERNAME, $startedAt
+    $safeCustomerName = if (-not [string]::IsNullOrWhiteSpace($CustomerName)) {
+        $invalidCharsPattern = "[{0}]" -f [regex]::Escape(([System.IO.Path]::GetInvalidFileNameChars() -join ''))
+        (($CustomerName.Trim() -replace $invalidCharsPattern, '_') -replace '\s+', '_')
+    } else {
+        $env:COMPUTERNAME
+    }
+    $reportFileName = "{0}_DLPHC_{1:yyyyMMdd_HHmmss}.html" -f $safeCustomerName, $startedAt
     $reportPath = Join-Path -Path ([Environment]::GetFolderPath('Desktop')) -ChildPath $reportFileName
     Set-Content -Path $reportPath -Value $htmlContent -Encoding UTF8 -Force
 
