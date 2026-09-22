@@ -190,7 +190,8 @@ function Get-KpiCardHtml {
 function New-DlpHtmlReport {
     param(
         [Parameter(Mandatory)] [object]$ReportData,
-        [string]$CustomerName = ''
+        [string]$CustomerName = '',
+        [switch]$OmitAgentDetailList
     )
 
     $reportData = $ReportData
@@ -716,10 +717,17 @@ if ($hasDb) {
             if ([int]$db.AgentAlertCount -gt $alertItems.Count) {
                 $alertTruncNote = "<p class='muted'>Listede ilk $($alertItems.Count) uyarı gösterilmektedir (toplam $($db.AgentAlertCount)).</p>"
             }
+            $agentDetailBlockHtml = ''
+            if ($OmitAgentDetailList) {
+                $agentDetailBlockHtml = "<p class='muted'>Agent bazında ayrıntılı liste bu belgede yer almamaktadır; tam liste HTML raporunda mevcuttur.</p>"
+            }
+            else {
+                $agentDetailBlockHtml = "<details style='margin-top:16px'><summary style='cursor:pointer;font-weight:600;color:#374151;font-size:14px'>Agent Bazında Ayrıntılı Liste ($($alertItems.Count) satır - açmak için tıklayın)</summary>" +
+                    "<div style='margin-top:12px'>$alertTable</div>$alertTruncNote</details>"
+            }
             $agentAlertHtml = "<section><h2>Agent Uyarıları</h2><div class='kpi-row'>$alertCards</div>" +
                 "<h3 style='font-size:14px;margin:16px 0 8px 0;color:#374151'>Uyarı Tipine Göre Özet</h3>$typeTable" +
-                "<details style='margin-top:16px'><summary style='cursor:pointer;font-weight:600;color:#374151;font-size:14px'>Agent Bazında Ayrıntılı Liste ($($alertItems.Count) satır - açmak için tıklayın)</summary>" +
-                "<div style='margin-top:12px'>$alertTable</div>$alertTruncNote</details>" +
+                "$agentDetailBlockHtml" +
                 "<p class='muted'>Enforce konsolundaki Agent Overview ekranındaki uyarılara karşılık gelir (Not Reporting, Outdated, Active Directory çözümleme hatası vb.). Sadece normalin dışındaki (Kritik/Uyarı) durumlar listelenir; bir agent'ta birden fazla uyarı olabilir.</p></section>"
         }
         else {
@@ -826,8 +834,11 @@ $html = @"
   footer { text-align: center; color: #9ca3af; font-size: 12px; margin-top: 20px; }
   @media print {
     body { background: #fff; }
-    section { box-shadow: none; border: 1px solid #e5e7eb; }
+    section { box-shadow: none; border: 1px solid #e5e7eb; break-inside: avoid; page-break-inside: avoid; }
     .editable-note { display: none; }
+    table.report-table, .kpi-row, .bar-row, .info-cards, details { break-inside: avoid; page-break-inside: avoid; }
+    table.report-table tr { break-inside: avoid; page-break-inside: avoid; }
+    h2, h3 { break-after: avoid; page-break-after: avoid; }
   }
 </style>
 </head>
@@ -1288,6 +1299,48 @@ function Get-DlpLicenseInfo {
         else { 'OK' }
 
     [pscustomobject]$info
+}
+
+function Get-DlpHeadlessBrowserPath {
+    $programFilesX86 = ${env:ProgramFiles(x86)}
+    $candidates = [System.Collections.Generic.List[string]]::new()
+    if ($env:ProgramFiles) {
+        [void]$candidates.Add((Join-Path $env:ProgramFiles 'Microsoft\Edge\Application\msedge.exe'))
+        [void]$candidates.Add((Join-Path $env:ProgramFiles 'Google\Chrome\Application\chrome.exe'))
+    }
+    if ($programFilesX86) {
+        [void]$candidates.Add((Join-Path $programFilesX86 'Microsoft\Edge\Application\msedge.exe'))
+        [void]$candidates.Add((Join-Path $programFilesX86 'Google\Chrome\Application\chrome.exe'))
+    }
+    foreach ($candidate in $candidates) {
+        if (Test-Path -LiteralPath $candidate) { return $candidate }
+    }
+    return $null
+}
+
+function New-DlpPdfReport {
+    param(
+        [Parameter(Mandatory)] [string]$BrowserPath,
+        [Parameter(Mandatory)] [string]$HtmlContent,
+        [Parameter(Mandatory)] [string]$PdfOutputPath
+    )
+
+    $tempHtmlPath = Join-Path ([System.IO.Path]::GetTempPath()) "dlphc_pdf_$([guid]::NewGuid().ToString('N')).html"
+    try {
+        Set-Content -Path $tempHtmlPath -Value $HtmlContent -Encoding UTF8 -Force
+        $tempHtmlUri = "file:///$($tempHtmlPath -replace '\\','/')"
+        $pdfArgs = @(
+            '--headless', '--disable-gpu', '--no-sandbox',
+            ('--print-to-pdf="{0}"' -f $PdfOutputPath),
+            '--no-pdf-header-footer',
+            ('"{0}"' -f $tempHtmlUri)
+        )
+        $pdfProcess = Start-Process -FilePath $BrowserPath -ArgumentList $pdfArgs -Wait -PassThru -WindowStyle Hidden
+        return ($pdfProcess.ExitCode -eq 0 -and (Test-Path -LiteralPath $PdfOutputPath))
+    }
+    finally {
+        Remove-Item -Path $tempHtmlPath -Force -ErrorAction SilentlyContinue
+    }
 }
 
 function Get-DlpSyslogInfo {
@@ -3973,6 +4026,26 @@ try {
 
     Write-Host ''
     Write-Host "HTML rapor olusturuldu: $reportPath" -ForegroundColor Green
+
+    try {
+        $pdfBrowserPath = Get-DlpHeadlessBrowserPath
+        if ($pdfBrowserPath) {
+            $pdfHtmlContent = New-DlpHtmlReport -ReportData $reportForHtml -CustomerName $CustomerName -OmitAgentDetailList
+            $pdfPath = [System.IO.Path]::ChangeExtension($reportPath, 'pdf')
+            if (New-DlpPdfReport -BrowserPath $pdfBrowserPath -HtmlContent $pdfHtmlContent -PdfOutputPath $pdfPath) {
+                Write-Host "PDF rapor olusturuldu: $pdfPath" -ForegroundColor Green
+            }
+            else {
+                Write-Host 'PDF rapor olusturulamadi (donusturme basarisiz oldu). HTML rapor kullanilabilir.' -ForegroundColor DarkYellow
+            }
+        }
+        else {
+            Write-Host 'PDF rapor olusturulamadi: sistemde Microsoft Edge veya Google Chrome bulunamadi. HTML rapor kullanilabilir.' -ForegroundColor DarkYellow
+        }
+    }
+    catch {
+        Write-Host "PDF rapor olusturulamadi: $($_.Exception.Message)" -ForegroundColor DarkYellow
+    }
 }
 catch {
     Write-Host ''
