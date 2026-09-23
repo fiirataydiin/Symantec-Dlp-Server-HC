@@ -190,7 +190,8 @@ function Get-KpiCardHtml {
 function New-DlpHtmlReport {
     param(
         [Parameter(Mandatory)] [object]$ReportData,
-        [string]$CustomerName = ''
+        [string]$CustomerName = '',
+        [switch]$OmitAgentDetailList
     )
 
     $reportData = $ReportData
@@ -452,22 +453,31 @@ if ($hasDb) {
             (Get-KpiCardHtml -Label 'IP entries' -Value ([string]$db.PatternIpEntries)) +
             (Get-KpiCardHtml -Label 'URL domain entries' -Value ([string]$db.PatternUrlEntries))
 
-        $patternColumns = [ordered]@{
-            'Pattern Name'                       = 'PatternName'
-            'Type'                               = 'PatternType'
-            'User / E-mail / Domain'      = 'UserEntries'
-            'IP'                                = 'IpEntries'
-            'URL Domain'                        = 'UrlEntries'
-            'Last Modified'                    = 'Modified'
-        }
         $activeItems = @(); if ($db.PSObject.Properties['PatternsActive']) { $activeItems = @($db.PatternsActive) }
 
         $patternListsHtml = ''
         if ($activeItems.Count -gt 0) {
-            $patternListsHtml += "<h3 style='font-size:14px;margin:16px 0 8px 0;color:#374151'>Active Patterns</h3>" + (Get-GenericTableHtml -Items $activeItems -Columns $patternColumns -RowColorSelector { param($i) '#16a34a' })
+            $patternDetailSb = New-Object System.Text.StringBuilder
+            foreach ($pat in $activeItems) {
+                $userText = if ([string]::IsNullOrWhiteSpace($pat.UserDetail) -or $pat.UserDetail -eq '-') { 'None' } else { ($pat.UserDetail -split ',' | Where-Object { $_ -ne '' } | ForEach-Object { $_.Trim() }) -join ', ' }
+                $ipText = if ([string]::IsNullOrWhiteSpace($pat.IpDetail) -or $pat.IpDetail -eq '-') { 'None' } else { ($pat.IpDetail -split ',' | Where-Object { $_ -ne '' } | ForEach-Object { $_.Trim() }) -join ', ' }
+                $urlText = if ([string]::IsNullOrWhiteSpace($pat.UrlDetail) -or $pat.UrlDetail -eq '-') { 'None' } else { ($pat.UrlDetail -split ',' | Where-Object { $_ -ne '' } | ForEach-Object { $_.Trim() }) -join ', ' }
+                $userTruncNote = if ($pat.UserTruncated) { " <span class='muted'>(showing the first 4000 characters; the list may be longer)</span>" } else { '' }
+                $ipTruncNote = if ($pat.IpTruncated) { " <span class='muted'>(showing the first 4000 characters; the list may be longer)</span>" } else { '' }
+                $urlTruncNote = if ($pat.UrlTruncated) { " <span class='muted'>(showing the first 4000 characters; the list may be longer)</span>" } else { '' }
+                $patternDetailHtml = "<details style='margin-bottom:8px;border:1px solid #e5e7eb;border-radius:8px;padding:8px 12px'>" +
+                    "<summary style='cursor:pointer;font-weight:600;color:#374151;font-size:13px'>$(ConvertTo-HtmlSafe $pat.PatternName) <span class='muted' style='font-weight:400'>($(ConvertTo-HtmlSafe $pat.PatternType) &mdash; User: $($pat.UserEntries), IP: $($pat.IpEntries), URL: $($pat.UrlEntries) &mdash; Last modified: $(ConvertTo-HtmlSafe $pat.Modified))</span></summary>" +
+                    "<div style='margin-top:8px;font-size:13px;color:#374151;line-height:1.6'>" +
+                    "<div style='margin-bottom:6px'><b>User / E-mail / Domain:</b> <span style='word-break:break-all'>$(ConvertTo-HtmlSafe $userText)</span>$userTruncNote</div>" +
+                    "<div style='margin-bottom:6px'><b>IP:</b> <span style='word-break:break-all'>$(ConvertTo-HtmlSafe $ipText)</span>$ipTruncNote</div>" +
+                    "<div><b>URL Domain:</b> <span style='word-break:break-all'>$(ConvertTo-HtmlSafe $urlText)</span>$urlTruncNote</div>" +
+                    "</div></details>"
+                [void]$patternDetailSb.Append($patternDetailHtml)
+            }
+            $patternListsHtml += "<h3 style='font-size:14px;margin:16px 0 8px 0;color:#374151'>Active Patterns ($($activeItems.Count) - click to see its user/IP/URL list)</h3>" + $patternDetailSb.ToString()
             if ([int]$db.PatternActiveCount -gt $activeItems.Count) { $patternListsHtml += "<p class='muted'>The first $($activeItems.Count) patterns are listed (total: $($db.PatternActiveCount)).</p>" }
         }
-        $patternNote = "<p class='muted'>No separate history is kept for users removed from within a pattern; only the current content of the pattern is available. Entry counts are calculated from the comma-separated entries of the active patterns.</p>"
+        $patternNote = "<p class='muted'>No separate history is kept for users removed from within a pattern; only the current content of the pattern is available. Click a pattern card to see its user/e-mail/domain, IP and URL domain entries (each field is capped at the first 4000 characters).</p>"
         $patternSectionHtml = "<section><h2>Sender/Recipient Pattern Summary</h2><div class='kpi-row'>$patternCards</div>$patternListsHtml$patternNote</section>"
     }
     else {
@@ -716,10 +726,17 @@ if ($hasDb) {
             if ([int]$db.AgentAlertCount -gt $alertItems.Count) {
                 $alertTruncNote = "<p class='muted'>The first $($alertItems.Count) alerts are listed (total: $($db.AgentAlertCount)).</p>"
             }
+            $agentDetailBlockHtml = ''
+            if ($OmitAgentDetailList) {
+                $agentDetailBlockHtml = "<p class='muted'>The detailed per-agent list is not included in this document; the full list is available in the HTML report.</p>"
+            }
+            else {
+                $agentDetailBlockHtml = "<details style='margin-top:16px'><summary style='cursor:pointer;font-weight:600;color:#374151;font-size:14px'>Per-Agent Detail ($($alertItems.Count) rows - click to expand)</summary>" +
+                    "<div style='margin-top:12px'>$alertTable</div>$alertTruncNote</details>"
+            }
             $agentAlertHtml = "<section><h2>Agent Alerts</h2><div class='kpi-row'>$alertCards</div>" +
                 "<h3 style='font-size:14px;margin:16px 0 8px 0;color:#374151'>Summary by Alert Type</h3>$typeTable" +
-                "<details style='margin-top:16px'><summary style='cursor:pointer;font-weight:600;color:#374151;font-size:14px'>Per-Agent Detail ($($alertItems.Count) rows - click to expand)</summary>" +
-                "<div style='margin-top:12px'>$alertTable</div>$alertTruncNote</details>" +
+                "$agentDetailBlockHtml" +
                 "<p class='muted'>Corresponds to the Agent Overview alerts in the Enforce console (Not Reporting, Outdated, AD resolution failure, etc.). Only Critical/Warning conditions are listed; a single agent can have more than one alert.</p></section>"
         }
         else {
@@ -826,8 +843,11 @@ $html = @"
   footer { text-align: center; color: #9ca3af; font-size: 12px; margin-top: 20px; }
   @media print {
     body { background: #fff; }
-    section { box-shadow: none; border: 1px solid #e5e7eb; }
+    section { box-shadow: none; border: 1px solid #e5e7eb; break-inside: avoid; page-break-inside: avoid; }
     .editable-note { display: none; }
+    table.report-table, .kpi-row, .bar-row, .info-cards, details { break-inside: avoid; page-break-inside: avoid; }
+    table.report-table tr { break-inside: avoid; page-break-inside: avoid; }
+    h2, h3 { break-after: avoid; page-break-after: avoid; }
   }
 </style>
 </head>
@@ -1288,6 +1308,48 @@ function Get-DlpLicenseInfo {
         else { 'OK' }
 
     [pscustomobject]$info
+}
+
+function Get-DlpHeadlessBrowserPath {
+    $programFilesX86 = ${env:ProgramFiles(x86)}
+    $candidates = [System.Collections.Generic.List[string]]::new()
+    if ($env:ProgramFiles) {
+        [void]$candidates.Add((Join-Path $env:ProgramFiles 'Microsoft\Edge\Application\msedge.exe'))
+        [void]$candidates.Add((Join-Path $env:ProgramFiles 'Google\Chrome\Application\chrome.exe'))
+    }
+    if ($programFilesX86) {
+        [void]$candidates.Add((Join-Path $programFilesX86 'Microsoft\Edge\Application\msedge.exe'))
+        [void]$candidates.Add((Join-Path $programFilesX86 'Google\Chrome\Application\chrome.exe'))
+    }
+    foreach ($candidate in $candidates) {
+        if (Test-Path -LiteralPath $candidate) { return $candidate }
+    }
+    return $null
+}
+
+function New-DlpPdfReport {
+    param(
+        [Parameter(Mandatory)] [string]$BrowserPath,
+        [Parameter(Mandatory)] [string]$HtmlContent,
+        [Parameter(Mandatory)] [string]$PdfOutputPath
+    )
+
+    $tempHtmlPath = Join-Path ([System.IO.Path]::GetTempPath()) "dlphc_pdf_$([guid]::NewGuid().ToString('N')).html"
+    try {
+        Set-Content -Path $tempHtmlPath -Value $HtmlContent -Encoding UTF8 -Force
+        $tempHtmlUri = "file:///$($tempHtmlPath -replace '\\','/')"
+        $pdfArgs = @(
+            '--headless', '--disable-gpu', '--no-sandbox',
+            ('--print-to-pdf="{0}"' -f $PdfOutputPath),
+            '--no-pdf-header-footer',
+            ('"{0}"' -f $tempHtmlUri)
+        )
+        $pdfProcess = Start-Process -FilePath $BrowserPath -ArgumentList $pdfArgs -Wait -PassThru -WindowStyle Hidden
+        return ($pdfProcess.ExitCode -eq 0 -and (Test-Path -LiteralPath $PdfOutputPath))
+    }
+    finally {
+        Remove-Item -Path $tempHtmlPath -Force -ErrorAction SilentlyContinue
+    }
 }
 
 function Get-DlpSyslogInfo {
@@ -2119,7 +2181,8 @@ FROM dual;
 SPOOL OFF
 
 SPOOL $patternListFile
-SELECT status_flag || '|' || REPLACE(pattern_name, '|', '/') || '|' || user_entries || '|' || ip_entries || '|' || url_entries || '|' || modified_text || '|' || rule_type
+SELECT status_flag || '|' || REPLACE(pattern_name, '|', '/') || '|' || user_entries || '|' || ip_entries || '|' || url_entries || '|' || modified_text || '|' || rule_type || '|' ||
+    user_detail || '|' || user_trunc || '|' || ip_detail || '|' || ip_trunc || '|' || url_detail || '|' || url_trunc
 FROM (
     SELECT
         CASE WHEN NVL(isdeleted, 0) = 0 THEN 'A' ELSE 'D' END AS status_flag,
@@ -2129,6 +2192,12 @@ FROM (
         NVL(REGEXP_COUNT(urldomains, '[^,[:space:]]+'), 0) AS url_entries,
         NVL(TO_CHAR(modifieddate, 'YYYY-MM-DD HH24:MI'), '-') AS modified_text,
         NVL(ruletype, -1) AS rule_type,
+        REPLACE(REPLACE(REPLACE(NVL(DBMS_LOB.SUBSTR(userpatterns, 4000, 1), '-'), CHR(10), ' '), CHR(13), ' '), '|', '/') AS user_detail,
+        CASE WHEN NVL(DBMS_LOB.GETLENGTH(userpatterns), 0) > 4000 THEN 'Y' ELSE 'N' END AS user_trunc,
+        REPLACE(REPLACE(REPLACE(NVL(DBMS_LOB.SUBSTR(ipaddresses, 4000, 1), '-'), CHR(10), ' '), CHR(13), ' '), '|', '/') AS ip_detail,
+        CASE WHEN NVL(DBMS_LOB.GETLENGTH(ipaddresses), 0) > 4000 THEN 'Y' ELSE 'N' END AS ip_trunc,
+        REPLACE(REPLACE(REPLACE(NVL(DBMS_LOB.SUBSTR(urldomains, 4000, 1), '-'), CHR(10), ' '), CHR(13), ' '), '|', '/') AS url_detail,
+        CASE WHEN NVL(DBMS_LOB.GETLENGTH(urldomains), 0) > 4000 THEN 'Y' ELSE 'N' END AS url_trunc,
         ROW_NUMBER() OVER (PARTITION BY CASE WHEN NVL(isdeleted, 0) = 0 THEN 'A' ELSE 'D' END ORDER BY name) AS rn
     FROM senderrecipientpattern
     WHERE name IS NOT NULL
@@ -2850,22 +2919,28 @@ EXIT SUCCESS
                 foreach ($patternLine in (Get-Content -LiteralPath $patternListFile -ErrorAction SilentlyContinue)) {
                     if ($patternLine -match 'ORA-\d+') { continue }
                     $patternParts = $patternLine.Trim() -split '\|'
-                    if ($patternParts.Count -eq 7 -and $patternParts[0] -match '^[AD]$' -and
+                    if ($patternParts.Count -eq 13 -and $patternParts[0] -match '^[AD]$' -and
                         $patternParts[2] -match '^\d+$' -and $patternParts[3] -match '^\d+$' -and $patternParts[4] -match '^\d+$' -and
                         $patternParts[6].Trim() -match '^-?\d+$') {
                         $patternTypeId = [int]$patternParts[6].Trim()
                         $patternTypeLabel = switch ($patternTypeId) {
                             2 { 'Recipient' }
                             4 { 'Sender' }
-                            default { "Tip $patternTypeId" }
+                            default { "Type $patternTypeId" }
                         }
                         $patternItem = [pscustomobject]@{
-                            PatternName = $patternParts[1].Trim()
-                            PatternType = $patternTypeLabel
-                            UserEntries = [int]$patternParts[2]
-                            IpEntries   = [int]$patternParts[3]
-                            UrlEntries  = [int]$patternParts[4]
-                            Modified    = $patternParts[5].Trim()
+                            PatternName    = $patternParts[1].Trim()
+                            PatternType    = $patternTypeLabel
+                            UserEntries    = [int]$patternParts[2]
+                            IpEntries      = [int]$patternParts[3]
+                            UrlEntries     = [int]$patternParts[4]
+                            Modified       = $patternParts[5].Trim()
+                            UserDetail     = $patternParts[7].Trim()
+                            UserTruncated  = ($patternParts[8].Trim() -eq 'Y')
+                            IpDetail       = $patternParts[9].Trim()
+                            IpTruncated    = ($patternParts[10].Trim() -eq 'Y')
+                            UrlDetail      = $patternParts[11].Trim()
+                            UrlTruncated   = ($patternParts[12].Trim() -eq 'Y')
                         }
                         if ($patternParts[0] -eq 'A') { [void]$patternsActive.Add($patternItem) }
                     }
@@ -3973,6 +4048,26 @@ try {
 
     Write-Host ''
     Write-Host "HTML report created: $reportPath" -ForegroundColor Green
+
+    try {
+        $pdfBrowserPath = Get-DlpHeadlessBrowserPath
+        if ($pdfBrowserPath) {
+            $pdfHtmlContent = New-DlpHtmlReport -ReportData $reportForHtml -CustomerName $CustomerName -OmitAgentDetailList
+            $pdfPath = [System.IO.Path]::ChangeExtension($reportPath, 'pdf')
+            if (New-DlpPdfReport -BrowserPath $pdfBrowserPath -HtmlContent $pdfHtmlContent -PdfOutputPath $pdfPath) {
+                Write-Host "PDF report created: $pdfPath" -ForegroundColor Green
+            }
+            else {
+                Write-Host 'The PDF report could not be created (conversion failed). The HTML report is still available.' -ForegroundColor DarkYellow
+            }
+        }
+        else {
+            Write-Host 'The PDF report could not be created: Microsoft Edge or Google Chrome was not found on this system. The HTML report is still available.' -ForegroundColor DarkYellow
+        }
+    }
+    catch {
+        Write-Host "The PDF report could not be created: $($_.Exception.Message)" -ForegroundColor DarkYellow
+    }
 }
 catch {
     Write-Host ''
