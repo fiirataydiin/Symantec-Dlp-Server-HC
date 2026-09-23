@@ -119,7 +119,7 @@ function Get-BarRowsHtml {
 
     $rows = @($Items) | Sort-Object -Property $ValueProperty -Descending | Select-Object -First $MaxRows
     if (@($rows).Count -eq 0) {
-        return '<p class="muted">No data.</p>'
+        return '<p class="muted">Veri yok.</p>'
     }
     $maxValue = ($rows | Measure-Object -Property $ValueProperty -Maximum).Maximum
     if (-not $maxValue -or $maxValue -le 0) { $maxValue = 1 }
@@ -142,7 +142,7 @@ function Get-GenericTableHtml {
     )
 
     $rows = @($Items)
-    if ($rows.Count -eq 0) { return '<p class="muted">No data.</p>' }
+    if ($rows.Count -eq 0) { return '<p class="muted">Veri yok.</p>' }
 
     $sb = New-Object System.Text.StringBuilder
     [void]$sb.Append('<table class="report-table"><thead><tr>')
@@ -169,10 +169,10 @@ function Get-FindingsTableHtml {
     param([object[]]$Findings)
 
     $rows = @($Findings)
-    if ($rows.Count -eq 0) { return '<p class="muted">No findings.</p>' }
+    if ($rows.Count -eq 0) { return '<p class="muted">Bulgu yok.</p>' }
 
     $sb = New-Object System.Text.StringBuilder
-    [void]$sb.AppendLine('<table class="report-table"><thead><tr><th>Status</th><th>Category</th><th>Metric</th><th>Value</th><th>Note</th></tr></thead><tbody>')
+    [void]$sb.AppendLine('<table class="report-table"><thead><tr><th>Durum</th><th>Kategori</th><th>Metrik</th><th>Değer</th><th>Not</th></tr></thead><tbody>')
     foreach ($f in $rows) {
         $color = Get-StatusColor -Status $f.Status
         [void]$sb.AppendLine("<tr><td><span class='badge' style='background:$color'>$(ConvertTo-HtmlSafe $f.Status)</span></td><td>$(ConvertTo-HtmlSafe $f.Category)</td><td>$(ConvertTo-HtmlSafe $f.Metric)</td><td>$(ConvertTo-HtmlSafe $f.Value)</td><td>$(ConvertTo-HtmlSafe $f.Note)</td></tr>")
@@ -209,7 +209,7 @@ $diskRowsHtml = New-Object System.Text.StringBuilder
 foreach ($disk in @($reportData.Disks)) {
     $freePct = [double]$disk.FreePercent
     $color = if ($freePct -le 10) { '#dc2626' } elseif ($freePct -le 20) { '#d97706' } else { '#16a34a' }
-    [void]$diskRowsHtml.AppendLine("<div class='bar-row'><div class='bar-label'>$(ConvertTo-HtmlSafe $disk.Drive) ($($disk.SizeGB) GB capacity)</div><div class='bar-track'><div class='bar-fill' style='width:$freePct%;background:$color'></div></div><div class='bar-value wide'>$($disk.FreeGB) GB / $freePct% free</div></div>")
+    [void]$diskRowsHtml.AppendLine("<div class='bar-row'><div class='bar-label'>$(ConvertTo-HtmlSafe $disk.Drive) ($($disk.SizeGB) GB kapasite)</div><div class='bar-track'><div class='bar-fill' style='width:$freePct%;background:$color'></div></div><div class='bar-value wide'>$($disk.FreeGB) GB / %$freePct boş</div></div>")
 }
 
 $cpuVal = $reportData.Hardware.CpuAveragePct
@@ -222,7 +222,7 @@ if ($hasDb) {
     foreach ($ts in @($db.Tablespaces)) {
         $usedPct = [double]$ts.UsedPct
         $color = if ($usedPct -gt 95) { '#dc2626' } elseif ($usedPct -ge 85) { '#d97706' } else { '#2563eb' }
-        [void]$tablespaceHtml.AppendLine("<div class='bar-row'><div class='bar-label'>$(ConvertTo-HtmlSafe $ts.Tablespace) ($($ts.UsedMB)/$($ts.TotalMB) MB)</div><div class='bar-track'><div class='bar-fill' style='width:$usedPct%;background:$color'></div></div><div class='bar-value'>$usedPct% used</div></div>")
+        [void]$tablespaceHtml.AppendLine("<div class='bar-row'><div class='bar-label'>$(ConvertTo-HtmlSafe $ts.Tablespace) ($($ts.UsedMB)/$($ts.TotalMB) MB)</div><div class='bar-track'><div class='bar-fill' style='width:$usedPct%;background:$color'></div></div><div class='bar-value'>%$usedPct dolu</div></div>")
     }
 }
 
@@ -233,7 +233,7 @@ if ($reportData.PSObject.Properties['HeartbeatStaleSeconds']) {
 }
 if ($hasDb) {
     $detectionServerItems = @(@($db.DetectionServers) | ForEach-Object {
-        $shownVersion = if ([string]$_.Version -match '^\d+\.\d+\.\d+\.\d+$') { [string]$_.Version } else { 'N/A' }
+        $shownVersion = if ([string]$_.Version -match '^\d+\.\d+\.\d+\.\d+$') { [string]$_.Version } else { 'Bilgi yok' }
         $shownState = if ($_.PSObject.Properties['Status']) { [string]$_.Status } else { 'Unknown' }
         $shownHeartbeat = if ($_.PSObject.Properties['LastHeartbeat'] -and [string]$_.LastHeartbeat -ne '-') { [string]$_.LastHeartbeat } else { '-' }
         $_ | Add-Member -NotePropertyName VersionDisplay -NotePropertyValue $shownVersion -Force
@@ -243,13 +243,13 @@ if ($hasDb) {
 }
 
 $systemEventsColumns = [ordered]@{
-    'Type'       = 'Type'
-    'Server'    = 'ServerName'
+    'Tür'       = 'Type'
+    'Sunucu'    = 'ServerName'
     'Host'      = 'HostName'
-    'Code'       = 'EventCode'
-    'Count'      = 'Count'
-    'Last Time' = 'LastTime'
-    'Message'     = 'Message'
+    'Kod'       = 'EventCode'
+    'Adet'      = 'Count'
+    'Son Zaman' = 'LastTime'
+    'Mesaj'     = 'Message'
 }
 
 $eventDays = 7
@@ -275,11 +275,11 @@ if ($hasDb) {
     if ($db.PSObject.Properties['SystemEventServers']) { $coverageItems = @($db.SystemEventServers) }
     if ($coverageItems.Count -gt 0) {
         $coverageColumns = [ordered]@{
-            'Server Queried' = 'ServerName'
-            'Errors'              = 'Errors'
-            'Warnings'             = 'Warnings'
+            'Sorgulanan Sunucu' = 'ServerName'
+            'Hata'              = 'Errors'
+            'Uyarı'             = 'Warnings'
         }
-        $eventCoverageHtml = "<p class='muted' style='margin:0 0 8px 0'>Events were queried for $($coverageItems.Count) servers (the Enforce Server and the active detection servers). Servers without events are shown as 0.</p>" +
+        $eventCoverageHtml = "<p class='muted' style='margin:0 0 8px 0'>Olaylar $($coverageItems.Count) sunucu için sorgulanmıştır (Enforce Server ve aktif detection server'lar). Olay bulunmayan sunucular 0 olarak görünür.</p>" +
             (Get-GenericTableHtml -Items $coverageItems -Columns $coverageColumns -RowColorSelector { param($i) if ([int]$i.Errors -gt 0) { '#dc2626' } elseif ([int]$i.Warnings -gt 0) { '#d97706' } else { '#16a34a' } })
     }
     $eventItems = @(@($db.SystemEvents) | Where-Object { $null -ne $_ })
@@ -287,24 +287,24 @@ if ($hasDb) {
         $eventTableHtml = "<div style='margin-top:14px'>" + (Get-GenericTableHtml -Items $eventItems -Columns $systemEventsColumns -RowColorSelector { param($i) Get-StatusColor -Status $i.Type }) + "</div>"
     }
     else {
-        $eventTableHtml = "<p class='note-ok'>There were no error or warning events in the last $eventDays days.</p>"
+        $eventTableHtml = "<p class='note-ok'>Son $eventDays günde hata veya uyarı olayı bulunmamaktadır.</p>"
     }
 }
 
 $detectionServerColumns = [ordered]@{
-    'Status'         = 'StatusDisplay'
-    'Server'        = 'ServerName'
+    'Durum'         = 'StatusDisplay'
+    'Sunucu'        = 'ServerName'
     'Host'          = 'HostName'
-    'Version'      = 'VersionDisplay'
-    'Product'          = 'Product'
-    'Channel'         = 'Channel'
-    'Last Heartbeat' = 'HeartbeatDisplay'
+    'Versiyon'      = 'VersionDisplay'
+    'Ürün'          = 'Product'
+    'Kanal'         = 'Channel'
+    'Son Heartbeat' = 'HeartbeatDisplay'
 }
 
 $dlpServiceColumns = [ordered]@{
-    'Service Name'     = 'DisplayName'
-    'Status'          = 'State'
-    'Start Mode' = 'StartMode'
+    'Servis Adı'     = 'DisplayName'
+    'Durum'          = 'State'
+    'Başlangıç Modu' = 'StartMode'
 }
 
 $generatedAt = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
@@ -312,31 +312,31 @@ $generatedAt = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
 $tierSectionHtml = ''
 if ($reportData.PSObject.Properties['TierAssessment'] -and $null -ne $reportData.TierAssessment) {
     $ta = $reportData.TierAssessment
-    $tierLabel = if ($ta.EffectiveTier -eq 'TwoTier') { 'Two-tier (Enforce Server + Oracle on the same server)' } else { 'Three-tier (Enforce Server and Oracle on separate servers)' }
-    $tierSource = if ($ta.DeclaredTier -eq 'TwoTier' -or $ta.DeclaredTier -eq 'ThreeTier') { 'Customer-declared' } else { 'Auto-detected' }
-    $levelTr = @{ 'Below minimum' = 'Below minimum'; 'Minimum' = 'Minimum'; 'Small' = 'Small'; 'Medium' = 'Medium'; 'Large' = 'Large' }
-    $metricTr = @{ 'CPU (logical)' = 'Logical CPU'; 'RAM (GB)' = 'RAM (GB)'; 'Total disk (GB)' = 'Total Disk (GB)' }
+    $tierLabel = if ($ta.EffectiveTier -eq 'TwoTier') { 'Two-tier (Enforce Server + Oracle aynı sunucuda)' } else { 'Three-tier (Enforce Server ve Oracle ayrı sunucularda)' }
+    $tierSource = if ($ta.DeclaredTier -eq 'TwoTier' -or $ta.DeclaredTier -eq 'ThreeTier') { 'Müşteri beyanı' } else { 'Otomatik tespit' }
+    $levelTr = @{ 'Below minimum' = 'Minimumun altında'; 'Minimum' = 'Minimum'; 'Small' = 'Small'; 'Medium' = 'Medium'; 'Large' = 'Large' }
+    $metricTr = @{ 'CPU (logical)' = 'Mantıksal CPU'; 'RAM (GB)' = 'RAM (GB)'; 'Total disk (GB)' = 'Toplam Disk (GB)' }
 
     $tierRows = @(@($ta.Rows) | ForEach-Object {
         [pscustomobject]@{
-            Component = $metricTr[[string]$_.Metric]
-            Current  = $_.Current
+            Bilesen = $metricTr[[string]$_.Metric]
+            Mevcut  = $_.Current
             Min     = $_.Min
             Small   = $_.Small
             Medium  = $_.Medium
             Large   = $_.Large
-            LevelName = $levelTr[[string]$_.Level]
+            Seviye  = $levelTr[[string]$_.Level]
             LevelId = $_.LevelId
         }
     })
     $tierColumns = [ordered]@{
-        'Component'            = 'Component'
-        'Current'             = 'Current'
+        'Bileşen'            = 'Bilesen'
+        'Mevcut'             = 'Mevcut'
         'Minimum'            = 'Min'
         'Small'              = 'Small'
         'Medium'             = 'Medium'
         'Large'              = 'Large'
-        'Level Met'  = 'LevelName'
+        'Karşılanan Seviye'  = 'Seviye'
     }
     $tierTable = Get-GenericTableHtml -Items $tierRows -Columns $tierColumns -RowColorSelector {
         param($i)
@@ -345,20 +345,20 @@ if ($reportData.PSObject.Properties['TierAssessment'] -and $null -ne $reportData
 
     $tierWarnHtml = ''
     if ($ta.ConsistencyStatus -eq 'Warning') {
-        $warnText = if ($ta.DeclaredTier -eq 'TwoTier') { 'Two-tier was selected but Oracle does not appear to run on this server. Please verify the deployment type.' } else { 'Three-tier was selected but Oracle appears to run on this server. Please verify the deployment type.' }
+        $warnText = if ($ta.DeclaredTier -eq 'TwoTier') { 'Two-tier seçildi ancak Oracle bu sunucuda görünmüyor. Kurulum tipini doğrulayın.' } else { 'Three-tier seçildi ancak Oracle bu sunucuda çalışıyor gibi görünüyor. Kurulum tipini doğrulayın.' }
         $tierWarnHtml = "<p class='note-warn'>$(ConvertTo-HtmlSafe $warnText)</p>"
     }
     $twoTierNote = ''
     if ($ta.EffectiveTier -eq 'TwoTier') {
-        $twoTierNote = ' Two-tier values are calculated as the sum of the Enforce and Oracle recommendations (Broadcom does not publish a separate two-tier table).'
+        $twoTierNote = ' Two-tier değerleri, Enforce ve Oracle önerilerinin toplamı olarak hesaplanmıştır (Broadcom ayrı bir two-tier tablosu yayınlamamaktadır).'
     }
 
-    $tierSectionHtml = "<section><h2>Deployment Type and Hardware Comparison</h2><div class='info-cards'>" +
-        "<div class='info-card'><div class='k'>Deployment Type</div><div class='v'>$(ConvertTo-HtmlSafe $tierLabel)</div></div>" +
-        "<div class='info-card'><div class='k'>Determined By</div><div class='v'>$(ConvertTo-HtmlSafe $tierSource)</div></div>" +
-        "<div class='info-card'><div class='k'>Level Met</div><div class='v'>$(ConvertTo-HtmlSafe $levelTr[[string]$ta.LevelName])</div></div>" +
+    $tierSectionHtml = "<section><h2>Kurulum Tipi ve Donanım Karşılaştırması</h2><div class='info-cards'>" +
+        "<div class='info-card'><div class='k'>Kurulum Tipi</div><div class='v'>$(ConvertTo-HtmlSafe $tierLabel)</div></div>" +
+        "<div class='info-card'><div class='k'>Belirleme Yöntemi</div><div class='v'>$(ConvertTo-HtmlSafe $tierSource)</div></div>" +
+        "<div class='info-card'><div class='k'>Karşılanan Seviye</div><div class='v'>$(ConvertTo-HtmlSafe $levelTr[[string]$ta.LevelName])</div></div>" +
         "</div>$tierWarnHtml<div style='margin-top:14px'>$tierTable</div>" +
-        "<p class='muted'>Source: Broadcom Symantec DLP 25.1 Hardware Requirements (Enforce Server and Oracle hardware recommendations). The required size depends on the daily incident volume, the number of detection servers and profile sizes.$twoTierNote</p></section>"
+        "<p class='muted'>Kaynak: Broadcom Symantec DLP 25.1 Hardware Requirements (Enforce Server ve Oracle donanım önerileri). Gerekli boyut; günlük incident hacmi, detection server sayısı ve profil boyutlarına göre değişir.$twoTierNote</p></section>"
 }
 
 $licenseSectionHtml = ''
@@ -367,12 +367,12 @@ if ($reportData.PSObject.Properties['License'] -and $null -ne $reportData.Licens
     $licKeys = @()
     if ($lic.PSObject.Properties['LicenseKeys']) { $licKeys = @(@($lic.LicenseKeys) | Where-Object { $null -ne $_ }) }
     if ($licKeys.Count -gt 0) {
-        $licStatusTr = @{ 'OK' = 'OK'; 'Expiring soon' = 'Expiring soon'; 'Expired' = 'Expired'; 'Not started' = 'Not started'; 'Unknown' = 'Unknown' }
+        $licStatusTr = @{ 'OK' = 'OK'; 'Expiring soon' = 'Yakında bitecek'; 'Expired' = 'Süresi dolmuş'; 'Not started' = 'Henüz başlamadı'; 'Unknown' = 'Bilinmiyor' }
         $licRows = @($licKeys | ForEach-Object {
             $licDays = $null
             if ($null -ne $_.DaysRemaining -and [string]$_.DaysRemaining -match '^-?\d+$') { $licDays = [int]$_.DaysRemaining }
             $licDaysText = '-'
-            if ($null -ne $licDays) { $licDaysText = if ($licDays -lt 0) { "expired $([math]::Abs($licDays)) days ago" } else { "$licDays" } }
+            if ($null -ne $licDays) { $licDaysText = if ($licDays -lt 0) { "$([math]::Abs($licDays)) gün önce doldu" } else { "$licDays" } }
             $licStatusText = $licStatusTr[[string]$_.Status]
             if ([string]::IsNullOrEmpty($licStatusText)) { $licStatusText = [string]$_.Status }
             [pscustomobject]@{
@@ -385,11 +385,11 @@ if ($reportData.PSObject.Properties['License'] -and $null -ne $reportData.Licens
             }
         })
         $licColumns = [ordered]@{
-            'Product'         = 'Product'
-            'Count'         = 'Count'
-            'Status'        = 'StatusText'
-            'Expiry Date' = 'Expiry'
-            'Days Remaining'    = 'DaysText'
+            'Ürün'         = 'Product'
+            'Adet'         = 'Count'
+            'Durum'        = 'StatusText'
+            'Bitiş Tarihi' = 'Expiry'
+            'Kalan Gün'    = 'DaysText'
         }
         $licTable = Get-GenericTableHtml -Items $licRows -Columns $licColumns -RowColorSelector {
             param($i)
@@ -398,16 +398,16 @@ if ($reportData.PSObject.Properties['License'] -and $null -ne $reportData.Licens
         $licOthers = @(); if ($lic.PSObject.Properties['OtherFiles']) { $licOthers = @(@($lic.OtherFiles) | Where-Object { $null -ne $_ }) }
         $licOthersHtml = ''
         if ($licOthers.Count -gt 0) {
-            $licOtherNames = (@($licOthers | ForEach-Object { "$($_.Name) (signed: $($_.SignDate))" }) -join ', ')
-            $licOthersHtml = "<p class='muted'>$($licOthers.Count) older license file(s) were also found in the license folder: $(ConvertTo-HtmlSafe $licOtherNames). The file with the newest signature date is used.</p>"
+            $licOtherNames = (@($licOthers | ForEach-Object { "$($_.Name) (imza: $($_.SignDate))" }) -join ', ')
+            $licOthersHtml = "<p class='muted'>Lisans klasöründe $($licOthers.Count) eski lisans dosyası daha bulunmuştur: $(ConvertTo-HtmlSafe $licOtherNames). İmza tarihi en yeni olan dosya esas alınmıştır.</p>"
         }
-        $licenseSectionHtml = "<h3 style='font-size:14px;margin:18px 0 8px 0;color:#374151'>License Status</h3>$licTable" +
-            "<p class='muted'>License file: $(ConvertTo-HtmlSafe ([string]$lic.CurrentFile)) (signature date: $(ConvertTo-HtmlSafe ([string]$lic.CurrentSignDate))). The status is calculated from the expiry date and the warning period in the license file (default 60 days).</p>$licOthersHtml"
+        $licenseSectionHtml = "<h3 style='font-size:14px;margin:18px 0 8px 0;color:#374151'>Lisans Durumu</h3>$licTable" +
+            "<p class='muted'>Lisans dosyası: $(ConvertTo-HtmlSafe ([string]$lic.CurrentFile)) (imza tarihi: $(ConvertTo-HtmlSafe ([string]$lic.CurrentSignDate))). Durum, bitiş tarihi ve lisans dosyasındaki uyarı süresine (varsayılan 60 gün) göre hesaplanmıştır.</p>$licOthersHtml"
     }
     else {
         $licSearched = ''
         if ($lic.PSObject.Properties['SearchedDirectories']) { $licSearched = (@($lic.SearchedDirectories) -join '; ') }
-        $licenseSectionHtml = "<h3 style='font-size:14px;margin:18px 0 8px 0;color:#374151'>License Status</h3><p class='muted'>The DLP license file (.slf) was not found or could not be read. Locations searched: $(ConvertTo-HtmlSafe $licSearched)</p>"
+        $licenseSectionHtml = "<h3 style='font-size:14px;margin:18px 0 8px 0;color:#374151'>Lisans Durumu</h3><p class='muted'>DLP lisans dosyası (.slf) bulunamadı veya okunamadı. Aranan konumlar: $(ConvertTo-HtmlSafe $licSearched)</p>"
     }
 }
 
@@ -416,63 +416,72 @@ if ($hasDb) {
     if ($db.PSObject.Properties['PolicySummaryStatus'] -and $db.PolicySummaryStatus -eq 'Successful') {
         $lookbackDays = if ($reportData.PSObject.Properties['IncidentLookbackDays']) { [int]$reportData.IncidentLookbackDays } else { 30 }
         $unusedCount = [int]$db.UnusedPolicyCount
-        $policyCards = (Get-KpiCardHtml -Label 'Total Policies' -Value ([string]$db.PolicyTotalCount)) +
-            (Get-KpiCardHtml -Label 'Total Policy Groups' -Value ([string]$db.PolicyGroupCount)) +
-            (Get-KpiCardHtml -Label "Policies with no incidents in the last $lookbackDays days" -Value ([string]$unusedCount) -Color $(if ($unusedCount -gt 0) { '#d97706' } else { '#16a34a' }))
+        $policyCards = (Get-KpiCardHtml -Label 'Toplam Politika' -Value ([string]$db.PolicyTotalCount)) +
+            (Get-KpiCardHtml -Label 'Toplam Politika Grubu' -Value ([string]$db.PolicyGroupCount)) +
+            (Get-KpiCardHtml -Label "Son $lookbackDays günde incident üretmeyen politika" -Value ([string]$unusedCount) -Color $(if ($unusedCount -gt 0) { '#d97706' } else { '#16a34a' }))
         $policyNote = if ($unusedCount -gt 0) {
-            "<p class='note-warn'>$unusedCount policies produced no incidents in the last $lookbackDays days. Reviewing these policies is recommended (they may be inactive, unnecessary or never triggered).</p>"
+            "<p class='note-warn'>Son $lookbackDays günde hiç incident üretmeyen $unusedCount politika bulunmaktadır. Bu politikaların gözden geçirilmesi (pasif, gereksiz veya hiç tetiklenmeyen kurallar olabilir) önerilir.</p>"
         } else {
-            "<p class='note-ok'>All policies produced at least one incident in the last $lookbackDays days.</p>"
+            "<p class='note-ok'>Tüm politikalar son $lookbackDays günde en az bir incident üretmiştir.</p>"
         }
         $unusedListHtml = ''
         $unusedItems = @()
         if ($db.PSObject.Properties['UnusedPolicies']) { $unusedItems = @($db.UnusedPolicies) }
         if ($unusedCount -gt 0 -and $unusedItems.Count -gt 0) {
             $unusedColumns = [ordered]@{
-                'Policy Name'   = 'PolicyName'
-                'Policy Group' = 'PolicyGroup'
+                'Politika Adı'   = 'PolicyName'
+                'Politika Grubu' = 'PolicyGroup'
             }
-            $unusedListHtml = "<h3 style='font-size:14px;margin:16px 0 8px 0;color:#374151'>Policies with no incidents in the last $lookbackDays days</h3>" +
+            $unusedListHtml = "<h3 style='font-size:14px;margin:16px 0 8px 0;color:#374151'>Son $lookbackDays günde incident üretmeyen politikalar</h3>" +
                 (Get-GenericTableHtml -Items $unusedItems -Columns $unusedColumns -RowColorSelector { param($i) '#d97706' })
             if ($unusedCount -gt $unusedItems.Count) {
-                $unusedListHtml += "<p class='muted'>The first $($unusedItems.Count) policies are listed (total: $unusedCount).</p>"
+                $unusedListHtml += "<p class='muted'>Listede ilk $($unusedItems.Count) politika gösterilmektedir (toplam $unusedCount).</p>"
             }
         }
-        $policySummaryHtml = "<section><h2>Policy Summary</h2><div class='kpi-row'>$policyCards</div>$policyNote$unusedListHtml</section>"
+        $policySummaryHtml = "<section><h2>Politika Özeti</h2><div class='kpi-row'>$policyCards</div>$policyNote$unusedListHtml</section>"
     }
     else {
-        $policySummaryHtml = "<section><h2>Policy Summary</h2><p class='muted'>The policy summary could not be read.</p></section>"
+        $policySummaryHtml = "<section><h2>Politika Özeti</h2><p class='muted'>Politika özeti okunamadı.</p></section>"
     }
 }
 
 $patternSectionHtml = ''
 if ($hasDb) {
     if ($db.PSObject.Properties['PatternSummaryStatus'] -and $db.PatternSummaryStatus -eq 'Successful') {
-        $patternCards = (Get-KpiCardHtml -Label 'Patterns (visible in the console)' -Value ([string]$db.PatternActiveCount)) +
-            (Get-KpiCardHtml -Label 'User / e-mail / domain entries' -Value ([string]$db.PatternUserEntries)) +
-            (Get-KpiCardHtml -Label 'IP entries' -Value ([string]$db.PatternIpEntries)) +
-            (Get-KpiCardHtml -Label 'URL domain entries' -Value ([string]$db.PatternUrlEntries))
+        $patternCards = (Get-KpiCardHtml -Label 'Pattern Sayısı (konsolda görünen)' -Value ([string]$db.PatternActiveCount)) +
+            (Get-KpiCardHtml -Label 'Kullanıcı / E-posta / Domain girdisi' -Value ([string]$db.PatternUserEntries)) +
+            (Get-KpiCardHtml -Label 'IP girdisi' -Value ([string]$db.PatternIpEntries)) +
+            (Get-KpiCardHtml -Label 'URL domain girdisi' -Value ([string]$db.PatternUrlEntries))
 
-        $patternColumns = [ordered]@{
-            'Pattern Name'                       = 'PatternName'
-            'Type'                               = 'PatternType'
-            'User / E-mail / Domain'      = 'UserEntries'
-            'IP'                                = 'IpEntries'
-            'URL Domain'                        = 'UrlEntries'
-            'Last Modified'                    = 'Modified'
-        }
         $activeItems = @(); if ($db.PSObject.Properties['PatternsActive']) { $activeItems = @($db.PatternsActive) }
 
         $patternListsHtml = ''
         if ($activeItems.Count -gt 0) {
-            $patternListsHtml += "<h3 style='font-size:14px;margin:16px 0 8px 0;color:#374151'>Active Patterns</h3>" + (Get-GenericTableHtml -Items $activeItems -Columns $patternColumns -RowColorSelector { param($i) '#16a34a' })
-            if ([int]$db.PatternActiveCount -gt $activeItems.Count) { $patternListsHtml += "<p class='muted'>The first $($activeItems.Count) patterns are listed (total: $($db.PatternActiveCount)).</p>" }
+            $patternDetailSb = New-Object System.Text.StringBuilder
+            foreach ($pat in $activeItems) {
+                $userText = if ([string]::IsNullOrWhiteSpace($pat.UserDetail) -or $pat.UserDetail -eq '-') { 'Yok' } else { ($pat.UserDetail -split ',' | Where-Object { $_ -ne '' } | ForEach-Object { $_.Trim() }) -join ', ' }
+                $ipText = if ([string]::IsNullOrWhiteSpace($pat.IpDetail) -or $pat.IpDetail -eq '-') { 'Yok' } else { ($pat.IpDetail -split ',' | Where-Object { $_ -ne '' } | ForEach-Object { $_.Trim() }) -join ', ' }
+                $urlText = if ([string]::IsNullOrWhiteSpace($pat.UrlDetail) -or $pat.UrlDetail -eq '-') { 'Yok' } else { ($pat.UrlDetail -split ',' | Where-Object { $_ -ne '' } | ForEach-Object { $_.Trim() }) -join ', ' }
+                $userTruncNote = if ($pat.UserTruncated) { " <span class='muted'>(ilk 4000 karakter gösteriliyor, liste daha uzun olabilir)</span>" } else { '' }
+                $ipTruncNote = if ($pat.IpTruncated) { " <span class='muted'>(ilk 4000 karakter gösteriliyor, liste daha uzun olabilir)</span>" } else { '' }
+                $urlTruncNote = if ($pat.UrlTruncated) { " <span class='muted'>(ilk 4000 karakter gösteriliyor, liste daha uzun olabilir)</span>" } else { '' }
+                $patternDetailHtml = "<details style='margin-bottom:8px;border:1px solid #e5e7eb;border-radius:8px;padding:8px 12px'>" +
+                    "<summary style='cursor:pointer;font-weight:600;color:#374151;font-size:13px'>$(ConvertTo-HtmlSafe $pat.PatternName) <span class='muted' style='font-weight:400'>($(ConvertTo-HtmlSafe $pat.PatternType) &mdash; Kullanıcı: $($pat.UserEntries), IP: $($pat.IpEntries), URL: $($pat.UrlEntries) &mdash; Son değişiklik: $(ConvertTo-HtmlSafe $pat.Modified))</span></summary>" +
+                    "<div style='margin-top:8px;font-size:13px;color:#374151;line-height:1.6'>" +
+                    "<div style='margin-bottom:6px'><b>Kullanıcı / E-posta / Domain:</b> <span style='word-break:break-all'>$(ConvertTo-HtmlSafe $userText)</span>$userTruncNote</div>" +
+                    "<div style='margin-bottom:6px'><b>IP:</b> <span style='word-break:break-all'>$(ConvertTo-HtmlSafe $ipText)</span>$ipTruncNote</div>" +
+                    "<div><b>URL Domain:</b> <span style='word-break:break-all'>$(ConvertTo-HtmlSafe $urlText)</span>$urlTruncNote</div>" +
+                    "</div></details>"
+                [void]$patternDetailSb.Append($patternDetailHtml)
+            }
+            $patternListsHtml += "<h3 style='font-size:14px;margin:16px 0 8px 0;color:#374151'>Aktif Pattern'ler ($($activeItems.Count) - içindeki kullanıcı/IP/URL listesi için tıklayın)</h3>" + $patternDetailSb.ToString()
+            if ([int]$db.PatternActiveCount -gt $activeItems.Count) { $patternListsHtml += "<p class='muted'>Listede ilk $($activeItems.Count) pattern gösterilmektedir (toplam $($db.PatternActiveCount)).</p>" }
         }
-        $patternNote = "<p class='muted'>No separate history is kept for users removed from within a pattern; only the current content of the pattern is available. Entry counts are calculated from the comma-separated entries of the active patterns.</p>"
-        $patternSectionHtml = "<section><h2>Sender/Recipient Pattern Summary</h2><div class='kpi-row'>$patternCards</div>$patternListsHtml$patternNote</section>"
+        $patternNote = "<p class='muted'>Bir pattern'in içinden sonradan silinen tek tek kullanıcılar için ayrı bir geçmiş kaydı tutulmaz; yalnızca pattern'in güncel içeriği görülebilir. Her pattern kartına tıklayarak içindeki kullanıcı/e-posta/domain, IP ve URL domain girdilerini görebilirsiniz (her alan ilk 4000 karakterle sınırlıdır).</p>"
+        $patternSectionHtml = "<section><h2>Sender/Recipient Pattern Özeti</h2><div class='kpi-row'>$patternCards</div>$patternListsHtml$patternNote</section>"
     }
     else {
-        $patternSectionHtml = "<section><h2>Sender/Recipient Pattern Summary</h2><p class='muted'>The pattern summary could not be read.</p></section>"
+        $patternSectionHtml = "<section><h2>Sender/Recipient Pattern Özeti</h2><p class='muted'>Pattern özeti okunamadı.</p></section>"
     }
 }
 
@@ -482,22 +491,22 @@ if ($reportData.PSObject.Properties['Syslog'] -and $null -ne $reportData.Syslog)
     switch ([string]$sl.Status) {
         'Configured' {
             $slConnText = switch ([string]$sl.Connectivity) {
-                'Reachable'       { 'Connection: Reachable (a TCP connection was established; message delivery is not verified)' }
-                'Unreachable'     { 'Connection: Unreachable (could not connect within 3 seconds)' }
-                'UdpUnverifiable' { 'Connection: cannot be verified for UDP' }
-                default           { 'Connection: not tested' }
+                'Reachable'       { 'Bağlantı: Erişilebilir (TCP bağlantısı kuruldu; mesaj iletimi doğrulanmaz)' }
+                'Unreachable'     { 'Bağlantı: Erişilemiyor (3 saniye içinde bağlantı kurulamadı)' }
+                'UdpUnverifiable' { 'Bağlantı: UDP olduğu için doğrulanamaz' }
+                default           { 'Bağlantı: Test edilmedi' }
             }
             $syslogRow = [pscustomobject]@{
-                Name   = 'Syslog (system events)'
-                State  = 'Yes'
-                Detail = "$($sl.Protocol)://$($sl.SyslogHost):$($sl.Port); level: $($sl.LevelText); $slConnText"
+                Name   = 'Syslog (sistem olayları)'
+                State  = 'Var'
+                Detail = "$($sl.Protocol)://$($sl.SyslogHost):$($sl.Port); seviye: $($sl.LevelText); $slConnText"
             }
         }
         'NotConfigured' {
-            $syslogRow = [pscustomobject]@{ Name = 'Syslog (system events)'; State = 'No'; Detail = 'The systemevent.syslog setting is not enabled in Manager.properties' }
+            $syslogRow = [pscustomobject]@{ Name = 'Syslog (sistem olayları)'; State = 'Yok'; Detail = 'Manager.properties içinde systemevent.syslog ayarı etkin değil' }
         }
         default {
-            $syslogRow = [pscustomobject]@{ Name = 'Syslog (system events)'; State = 'Unknown'; Detail = 'Manager.properties was not found (the script may not have been run on the Enforce Server)' }
+            $syslogRow = [pscustomobject]@{ Name = 'Syslog (sistem olayları)'; State = 'Bilinmiyor'; Detail = 'Manager.properties bulunamadı (script Enforce sunucusunda çalıştırılmamış olabilir)' }
         }
     }
 }
@@ -511,9 +520,9 @@ $oracleRuCardsHtml = ''
 if ($hasDb) {
     $dbHas = { param($name) $db.PSObject.Properties[$name] }
     if (& $dbHas 'OracleBinaryRu') {
-        $registryRuText = if ([string]$db.OracleRegistryRu -eq 'N/A') { 'Could not be read' } else { [string]$db.OracleRegistryRu }
-        $oracleRuCardsHtml = "<div class='info-card'><div class='k'>RU Level (binary / v`$version)</div><div class='v'>$(ConvertTo-HtmlSafe ([string]$db.OracleBinaryRu))</div></div>" +
-            "<div class='info-card'><div class='k'>Last RU in Patch Registry (dba_registry)</div><div class='v'>$(ConvertTo-HtmlSafe $registryRuText)</div></div>"
+        $registryRuText = if ([string]$db.OracleRegistryRu -eq 'N/A') { 'Okunamadı' } else { [string]$db.OracleRegistryRu }
+        $oracleRuCardsHtml = "<div class='info-card'><div class='k'>RU Seviyesi (binary / v`$version)</div><div class='v'>$(ConvertTo-HtmlSafe ([string]$db.OracleBinaryRu))</div></div>" +
+            "<div class='info-card'><div class='k'>Yama Kaydındaki Son RU (dba_registry)</div><div class='v'>$(ConvertTo-HtmlSafe $registryRuText)</div></div>"
 
         $patchRows = @()
         $patchSource = ''
@@ -532,19 +541,19 @@ if ($hasDb) {
 
         $patchTableHtml = ''
         if ($patchRows.Count -gt 0) {
-            $patchColumns = [ordered]@{ 'Time' = 'Time'; 'Action' = 'Action'; 'Status / Version' = 'Status'; 'Description' = 'Detail' }
-            $patchTableHtml = "<h3 style='font-size:14px;margin:16px 0 8px 0;color:#374151'>Oracle Patch History</h3>" + (Get-GenericTableHtml -Items $patchRows -Columns $patchColumns)
+            $patchColumns = [ordered]@{ 'Zaman' = 'Time'; 'İşlem' = 'Action'; 'Durum / Sürüm' = 'Status'; 'Açıklama' = 'Detail' }
+            $patchTableHtml = "<h3 style='font-size:14px;margin:16px 0 8px 0;color:#374151'>Oracle Yama Geçmişi</h3>" + (Get-GenericTableHtml -Items $patchRows -Columns $patchColumns)
         }
 
         $ruWarnHtml = ''
         if ((& $dbHas 'OracleRuStatus') -and $db.OracleRuStatus -eq 'Mismatch') {
-            $ruWarnHtml = "<p class='note-warn'>The Oracle binary RU level ($(ConvertTo-HtmlSafe ([string]$db.OracleBinaryRu))) differs from the last RU in the database patch registry ($(ConvertTo-HtmlSafe ([string]$db.OracleRegistryRu))). This may indicate that the patch was applied to the binaries but not completed on the database side (datapatch). Confirm the effective patch level with your DBA before evaluating the version/patch conditions in CVE advisories.</p>"
+            $ruWarnHtml = "<p class='note-warn'>Oracle binary RU seviyesi ($(ConvertTo-HtmlSafe ([string]$db.OracleBinaryRu))) ile veritabanı yama kaydındaki son RU ($(ConvertTo-HtmlSafe ([string]$db.OracleRegistryRu))) farklı görünüyor. Bu, yamanın binary'lere uygulanıp veritabanı tarafında (datapatch) tamamlanmamış olabileceğine işaret eder. CVE duyurularındaki sürüm/yama koşulunu değerlendirmeden önce geçerli seviyeyi DBA ile doğrulayın.</p>"
         }
         $sqlPatchNote = ''
         if ((& $dbHas 'OracleSqlPatchStatus') -and $db.OracleSqlPatchStatus -eq 'Unavailable') {
-            $sqlPatchNote = ' The detailed patch list (dba_registry_sqlpatch) could not be read because the connecting user has no privilege on it; the patch record is shown from dba_registry_history instead.'
+            $sqlPatchNote = ' Ayrıntılı yama listesi (dba_registry_sqlpatch) bağlantı kullanıcısının yetkisi olmadığı için okunamadı; yama kaydı dba_registry_history üzerinden gösterilmiştir.'
         }
-        $oraclePatchHtml = "$ruWarnHtml$patchTableHtml<p class='muted'>The RU level is taken from Oracle's v`$version output (binary) and from the values in the patch registry table.$sqlPatchNote</p>"
+        $oraclePatchHtml = "$ruWarnHtml$patchTableHtml<p class='muted'>RU seviyesi, Oracle'ın v`$version çıktısındaki (binary) ve yama kayıt tablosundaki değerlerden alınmıştır.$sqlPatchNote</p>"
     }
 }
 
@@ -558,11 +567,11 @@ if ($hasDb) {
         $failedUsers = @($accessUsers | Where-Object { [int]$_.FailedAttempts -gt 0 })
         $disabledUsers = @($accessUsers | Where-Object { $_.PSObject.Properties['Status'] -and [string]$_.Status -eq 'Disabled' })
 
-        $accessCards = (Get-KpiCardHtml -Label 'Console Users' -Value ([string]$accessUsers.Count)) +
-            (Get-KpiCardHtml -Label 'Disabled users' -Value ([string]$disabledUsers.Count) -Color $(if ($disabledUsers.Count -gt 0) { '#d97706' } else { '#16a34a' })) +
-            (Get-KpiCardHtml -Label 'Roles' -Value ([string]$accessRoles.Count)) +
-            (Get-KpiCardHtml -Label 'Users inactive in the last 90 days' -Value ([string]$inactiveUsers.Count) -Color $(if ($inactiveUsers.Count -gt 0) { '#d97706' } else { '#16a34a' })) +
-            (Get-KpiCardHtml -Label 'Users with failed login attempts' -Value ([string]$failedUsers.Count) -Color $(if ($failedUsers.Count -gt 0) { '#d97706' } else { '#16a34a' }))
+        $accessCards = (Get-KpiCardHtml -Label 'Konsol Kullanıcısı' -Value ([string]$accessUsers.Count)) +
+            (Get-KpiCardHtml -Label 'Devre dışı (Disabled) kullanıcı' -Value ([string]$disabledUsers.Count) -Color $(if ($disabledUsers.Count -gt 0) { '#d97706' } else { '#16a34a' })) +
+            (Get-KpiCardHtml -Label 'Rol' -Value ([string]$accessRoles.Count)) +
+            (Get-KpiCardHtml -Label 'Son 90 günde aktif olmayan kullanıcı' -Value ([string]$inactiveUsers.Count) -Color $(if ($inactiveUsers.Count -gt 0) { '#d97706' } else { '#16a34a' })) +
+            (Get-KpiCardHtml -Label 'Başarısız giriş denemesi olan kullanıcı' -Value ([string]$failedUsers.Count) -Color $(if ($failedUsers.Count -gt 0) { '#d97706' } else { '#16a34a' }))
 
         $userRows = @($accessUsers | ForEach-Object {
             [pscustomobject]@{
@@ -578,84 +587,84 @@ if ($hasDb) {
             }
         })
         $userColumns = [ordered]@{
-            'User'         = 'DisplayName'
-            'Status'             = 'StatusText'
-            'E-mail'           = 'Email'
-            'Roles'            = 'Roles'
-            'Authentication'  = 'AuthMethods'
-            'Last Active'         = 'LastActive'
-            'Failed Attempts'  = 'FailedAttempts'
-            'Last Lockout'    = 'LastLockout'
+            'Kullanıcı'         = 'DisplayName'
+            'Durum'             = 'StatusText'
+            'E-posta'           = 'Email'
+            'Roller'            = 'Roles'
+            'Kimlik Doğrulama'  = 'AuthMethods'
+            'Son Aktif'         = 'LastActive'
+            'Başarısız Deneme'  = 'FailedAttempts'
+            'Son Kilitlenme'    = 'LastLockout'
         }
         $userTable = Get-GenericTableHtml -Items $userRows -Columns $userColumns -RowColorSelector { param($i) if ($i.StatusText -eq 'Disabled') { '#dc2626' } elseif ($i.IsInactive) { '#d97706' } else { '#16a34a' } }
 
         $roleRows = @($accessRoles | ForEach-Object {
             [pscustomobject]@{
                 RoleName  = $_.RoleName
-                AdManaged = $(if ($_.AdManaged) { 'Yes' } else { 'No' })
+                AdManaged = $(if ($_.AdManaged) { 'Evet' } else { 'Hayır' })
                 UserCount = $_.UserCount
             }
         })
         $roleColumns = [ordered]@{
-            'Role'                     = 'RoleName'
-            'AD-Managed'      = 'AdManaged'
-            'User Count'        = 'UserCount'
+            'Rol'                     = 'RoleName'
+            'AD ile Yönetiliyor'      = 'AdManaged'
+            'Kullanıcı Sayısı'        = 'UserCount'
         }
         $roleTable = Get-GenericTableHtml -Items $roleRows -Columns $roleColumns
 
-        $consoleAccessHtml = "<section><h2>Console Users and Roles</h2><div class='kpi-row'>$accessCards</div>" +
-            "<h3 style='font-size:14px;margin:16px 0 8px 0;color:#374151'>Users</h3>$userTable" +
-            "<h3 style='font-size:14px;margin:16px 0 8px 0;color:#374151'>Roles</h3>$roleTable" +
-            "<p class='muted'>Passwords and password hashes are never read. The internal system account (internal system user) and deleted users are excluded. Status: a user is shown as Disabled if the lockout date (Last Lockout) is set (disabled from the console or locked out) or if no authentication method is enabled; otherwise Enabled (Disabled rows are red). Users whose last active date is older than 90 days or missing are marked orange.</p></section>"
+        $consoleAccessHtml = "<section><h2>Konsol Kullanıcıları ve Roller</h2><div class='kpi-row'>$accessCards</div>" +
+            "<h3 style='font-size:14px;margin:16px 0 8px 0;color:#374151'>Kullanıcılar</h3>$userTable" +
+            "<h3 style='font-size:14px;margin:16px 0 8px 0;color:#374151'>Roller</h3>$roleTable" +
+            "<p class='muted'>Parolalar ve parola özetleri okunmaz. Dahili sistem hesabı (internal system user) ve silinmiş kullanıcılar listeden çıkarılmıştır. Durum: kullanıcının kilitlenme tarihi (Son Kilitlenme) doluysa (konsoldan devre dışı bırakılmış veya kilitlenmiş) ya da hiçbir kimlik doğrulama yöntemi etkin değilse Disabled, aksi halde Enabled gösterilir (Disabled satırlar kırmızıdır). Son aktif tarihi 90 günden eski veya hiç olmayan kullanıcılar turuncu ile işaretlenir.</p></section>"
     }
     else {
-        $consoleAccessHtml = "<section><h2>Console Users and Roles</h2><p class='muted'>Console user and role information could not be read.</p></section>"
+        $consoleAccessHtml = "<section><h2>Konsol Kullanıcıları ve Roller</h2><p class='muted'>Konsol kullanıcı ve rol bilgisi okunamadı.</p></section>"
     }
 
     if ($db.PSObject.Properties['IntegrationStatus'] -and $db.IntegrationStatus -eq 'Successful') {
         $adItems = @(@($db.AdConnections) | Where-Object { $null -ne $_ })
         $ocrItems = @(@($db.OcrConfigs) | Where-Object { $null -ne $_ })
         $adDetail = if ($adItems.Count -gt 0) {
-            (@($adItems | ForEach-Object { "$($_.Name): $($_.Host):$($_.Port), SSL: $(if ($_.UseSsl) { 'Yes' } else { 'No' })" }) -join '; ')
+            (@($adItems | ForEach-Object { "$($_.Name): $($_.Host):$($_.Port), SSL: $(if ($_.UseSsl) { 'Evet' } else { 'Hayır' })" }) -join '; ')
         } else { '-' }
         $ocrDetail = if ($ocrItems.Count -gt 0) {
-            (@($ocrItems | ForEach-Object { "$($_.Name): $($_.Host):$($_.Port); used by: $($_.Servers)" }) -join '; ')
+            (@($ocrItems | ForEach-Object { "$($_.Name): $($_.Host):$($_.Port); kullanan sunucular: $($_.Servers)" }) -join '; ')
         } else { '-' }
 
-        $mipState = 'Unknown'; $mipDetail = 'MIP/AIP information could not be read (the related tables may not exist in this DLP version).'
+        $mipState = 'Bilinmiyor'; $mipDetail = 'MIP/AIP bilgisi okunamadı (bu DLP sürümünde ilgili tablolar bulunmuyor olabilir).'
         if ($db.PSObject.Properties['MipStatus']) {
-            if ($db.MipStatus -eq 'Configured') { $mipState = 'Yes' }
-            elseif ($db.MipStatus -eq 'NotConfigured') { $mipState = 'No' }
+            if ($db.MipStatus -eq 'Configured') { $mipState = 'Var' }
+            elseif ($db.MipStatus -eq 'NotConfigured') { $mipState = 'Yok' }
             if ($db.MipStatus -ne 'Unknown' -and $db.MipStatus -ne 'Not tested') {
-                $mipDetail = "AIP tenant: $($db.MipTenantCount); ICT connection: $($db.MipIctCount); AIP labels: $($db.MipLabelCount)"
+                $mipDetail = "AIP tenant: $($db.MipTenantCount); ICT bağlantısı: $($db.MipIctCount); AIP etiketi: $($db.MipLabelCount)"
             }
         }
 
         $integrationRows = @(
-            [pscustomobject]@{ Name = 'Active Directory (LDAP connection)'; State = $(if ($adItems.Count -gt 0) { 'Yes' } else { 'No' }); Detail = $adDetail },
-            [pscustomobject]@{ Name = 'Console login with AD account'; State = $(if ($db.PSObject.Properties['AdLoginDomains'] -and -not [string]::IsNullOrWhiteSpace([string]$db.AdLoginDomains)) { 'Yes' } else { 'No' }); Detail = $(if ($db.PSObject.Properties['AdLoginDomains'] -and -not [string]::IsNullOrWhiteSpace([string]$db.AdLoginDomains)) { "Domains: $($db.AdLoginDomains)" } else { '-' }) },
-            [pscustomobject]@{ Name = 'AD-managed roles'; State = $(if ([int]$db.AdManagedRoles -gt 0) { 'Yes' } else { 'No' }); Detail = "Roles: $($db.AdManagedRoles)" },
-            [pscustomobject]@{ Name = 'OCR'; State = $(if ($ocrItems.Count -gt 0) { 'Yes' } else { 'No' }); Detail = $ocrDetail },
+            [pscustomobject]@{ Name = 'Active Directory (LDAP bağlantısı)'; State = $(if ($adItems.Count -gt 0) { 'Var' } else { 'Yok' }); Detail = $adDetail },
+            [pscustomobject]@{ Name = 'Konsol girişinde AD hesabı ile doğrulama'; State = $(if ($db.PSObject.Properties['AdLoginDomains'] -and -not [string]::IsNullOrWhiteSpace([string]$db.AdLoginDomains)) { 'Var' } else { 'Yok' }); Detail = $(if ($db.PSObject.Properties['AdLoginDomains'] -and -not [string]::IsNullOrWhiteSpace([string]$db.AdLoginDomains)) { "Etki alanları: $($db.AdLoginDomains)" } else { '-' }) },
+            [pscustomobject]@{ Name = 'AD ile yönetilen roller'; State = $(if ([int]$db.AdManagedRoles -gt 0) { 'Var' } else { 'Yok' }); Detail = "Rol sayısı: $($db.AdManagedRoles)" },
+            [pscustomobject]@{ Name = 'OCR'; State = $(if ($ocrItems.Count -gt 0) { 'Var' } else { 'Yok' }); Detail = $ocrDetail },
             [pscustomobject]@{ Name = 'MIP (Microsoft Information Protection / AIP)'; State = $mipState; Detail = $mipDetail }
         )
         if ($null -ne $syslogRow) { $integrationRows += $syslogRow }
         $integrationColumns = [ordered]@{
-            'Integration' = 'Name'
-            'Status'       = 'State'
-            'Detail'       = 'Detail'
+            'Entegrasyon' = 'Name'
+            'Durum'       = 'State'
+            'Detay'       = 'Detail'
         }
-        $integrationTable = Get-GenericTableHtml -Items $integrationRows -Columns $integrationColumns -RowColorSelector { param($i) if ($i.State -eq 'Yes') { '#16a34a' } else { '#9ca3af' } }
+        $integrationTable = Get-GenericTableHtml -Items $integrationRows -Columns $integrationColumns -RowColorSelector { param($i) if ($i.State -eq 'Var') { '#16a34a' } else { '#9ca3af' } }
 
         $sslWarnHtml = ''
         $noSslItems = @($adItems | Where-Object { -not $_.UseSsl })
         if ($noSslItems.Count -gt 0) {
-            $sslWarnHtml = "<p class='note-warn'>The AD connection does not use SSL ($(ConvertTo-HtmlSafe (@($noSslItems | ForEach-Object { $_.Name }) -join ', '))). Unencrypted LDAP traffic can expose credentials; using LDAPS is recommended.</p>"
+            $sslWarnHtml = "<p class='note-warn'>AD bağlantısı SSL kullanmıyor ($(ConvertTo-HtmlSafe (@($noSslItems | ForEach-Object { $_.Name }) -join ', '))). Şifrelenmemiş LDAP trafiği kimlik bilgilerini açığa çıkarabilir; LDAPS kullanılması önerilir.</p>"
         }
-        $integrationHtml = "<section><h2>Integration Status</h2>$integrationTable$sslWarnHtml" +
-            "<p class='muted'>The MIP status is determined from the Azure Information Protection and Information Centric Tagging configuration records in Enforce. The Syslog row shows the system-event setting in Manager.properties on the Enforce Server; 'Log to a Syslog Server' response rules are not checked in this row.</p></section>"
+        $integrationHtml = "<section><h2>Entegrasyon Durumu</h2>$integrationTable$sslWarnHtml" +
+            "<p class='muted'>MIP durumu, Enforce'taki Azure Information Protection ve Information Centric Tagging yapılandırma kayıtlarına bakılarak belirlenir. Syslog satırı, Enforce sunucusundaki Manager.properties dosyasındaki sistem olayı ayarını gösterir; 'Log to a Syslog Server' yanıt kuralları bu satırda kontrol edilmez.</p></section>"
     }
     else {
-        $integrationHtml = "<section><h2>Integration Status</h2><p class='muted'>Integration information could not be read.</p></section>"
+        $integrationHtml = "<section><h2>Entegrasyon Durumu</h2><p class='muted'>Entegrasyon bilgisi okunamadı.</p></section>"
     }
 }
 
@@ -667,25 +676,25 @@ if ($hasDb) {
         $warnCount = [int]$db.AgentAlertWarningCount
         $affectedCount = [int]$db.AgentAlertAffectedCount
 
-        $alertCards = (Get-KpiCardHtml -Label 'Critical Alerts' -Value ([string]$critCount) -Color $(if ($critCount -gt 0) { '#dc2626' } else { '#16a34a' })) +
-            (Get-KpiCardHtml -Label 'Warnings' -Value ([string]$warnCount) -Color $(if ($warnCount -gt 0) { '#d97706' } else { '#16a34a' })) +
-            (Get-KpiCardHtml -Label 'Affected Agents' -Value ([string]$affectedCount) -Color $(if ($affectedCount -gt 0) { '#d97706' } else { '#16a34a' }))
+        $alertCards = (Get-KpiCardHtml -Label 'Kritik Uyarı' -Value ([string]$critCount) -Color $(if ($critCount -gt 0) { '#dc2626' } else { '#16a34a' })) +
+            (Get-KpiCardHtml -Label 'Uyarı' -Value ([string]$warnCount) -Color $(if ($warnCount -gt 0) { '#d97706' } else { '#16a34a' })) +
+            (Get-KpiCardHtml -Label 'Etkilenen Agent Sayısı' -Value ([string]$affectedCount) -Color $(if ($affectedCount -gt 0) { '#d97706' } else { '#16a34a' }))
 
         if ($alertItems.Count -gt 0) {
             $typeItems = @()
             if ($db.PSObject.Properties['AgentAlertTypes']) { $typeItems = @(@($db.AgentAlertTypes) | Where-Object { $null -ne $_ }) }
             $typeRows = @($typeItems | ForEach-Object {
                 [pscustomobject]@{
-                    SeverityText = $(if ($_.Severity -eq 3) { 'Critical' } else { 'Warning' })
+                    SeverityText = $(if ($_.Severity -eq 3) { 'Kritik' } else { 'Uyarı' })
                     Message       = $_.Message
                     AffectedCount = $_.AffectedCount
                     Severity      = $_.Severity
                 }
             })
             $typeColumns = [ordered]@{
-                'Severity'         = 'SeverityText'
-                'Alert Type'       = 'Message'
-                'Affected Agents'  = 'AffectedCount'
+                'Önem'                  = 'SeverityText'
+                'Uyarı Tipi'            = 'Message'
+                'Etkilenen Agent Sayısı' = 'AffectedCount'
             }
             $typeTable = Get-GenericTableHtml -Items $typeRows -Columns $typeColumns -RowColorSelector {
                 param($i) if ([int]$i.Severity -eq 3) { '#dc2626' } else { '#d97706' }
@@ -695,7 +704,7 @@ if ($hasDb) {
                 [pscustomobject]@{
                     AgentName  = $_.AgentName
                     AgentIp    = $_.AgentIp
-                    SeverityText = $(if ($_.Severity -eq 3) { 'Critical' } else { 'Warning' })
+                    SeverityText = $(if ($_.Severity -eq 3) { 'Kritik' } else { 'Uyarı' })
                     Message    = $_.Message
                     Detail     = $_.Detail
                     RecordTime = $_.RecordTime
@@ -703,39 +712,39 @@ if ($hasDb) {
                 }
             })
             $alertColumns = [ordered]@{
-                'Agent'       = 'AgentName'
-                'IP'          = 'AgentIp'
-                'Severity'    = 'SeverityText'
-                'Alert'       = 'Message'
-                'Detail'      = 'Detail'
-                'Record Time' = 'RecordTime'
+                'Agent'        = 'AgentName'
+                'IP'           = 'AgentIp'
+                'Önem'         = 'SeverityText'
+                'Uyarı'        = 'Message'
+                'Ayrıntı'      = 'Detail'
+                'Kayıt Zamanı' = 'RecordTime'
             }
             $alertTable = Get-GenericTableHtml -Items $alertRows -Columns $alertColumns -RowColorSelector {
                 param($i) if ([int]$i.Severity -eq 3) { '#dc2626' } else { '#d97706' }
             }
             $alertTruncNote = ''
             if ([int]$db.AgentAlertCount -gt $alertItems.Count) {
-                $alertTruncNote = "<p class='muted'>The first $($alertItems.Count) alerts are listed (total: $($db.AgentAlertCount)).</p>"
+                $alertTruncNote = "<p class='muted'>Listede ilk $($alertItems.Count) uyarı gösterilmektedir (toplam $($db.AgentAlertCount)).</p>"
             }
             $agentDetailBlockHtml = ''
             if ($OmitAgentDetailList) {
-                $agentDetailBlockHtml = "<p class='muted'>The detailed per-agent list is not included in this document; the full list is available in the HTML report.</p>"
+                $agentDetailBlockHtml = "<p class='muted'>Agent bazında ayrıntılı liste bu belgede yer almamaktadır; tam liste HTML raporunda mevcuttur.</p>"
             }
             else {
-                $agentDetailBlockHtml = "<details style='margin-top:16px'><summary style='cursor:pointer;font-weight:600;color:#374151;font-size:14px'>Per-Agent Detail ($($alertItems.Count) rows - click to expand)</summary>" +
+                $agentDetailBlockHtml = "<details style='margin-top:16px'><summary style='cursor:pointer;font-weight:600;color:#374151;font-size:14px'>Agent Bazında Ayrıntılı Liste ($($alertItems.Count) satır - açmak için tıklayın)</summary>" +
                     "<div style='margin-top:12px'>$alertTable</div>$alertTruncNote</details>"
             }
-            $agentAlertHtml = "<section><h2>Agent Alerts</h2><div class='kpi-row'>$alertCards</div>" +
-                "<h3 style='font-size:14px;margin:16px 0 8px 0;color:#374151'>Summary by Alert Type</h3>$typeTable" +
+            $agentAlertHtml = "<section><h2>Agent Uyarıları</h2><div class='kpi-row'>$alertCards</div>" +
+                "<h3 style='font-size:14px;margin:16px 0 8px 0;color:#374151'>Uyarı Tipine Göre Özet</h3>$typeTable" +
                 "$agentDetailBlockHtml" +
-                "<p class='muted'>Corresponds to the Agent Overview alerts in the Enforce console (Not Reporting, Outdated, AD resolution failure, etc.). Only Critical/Warning conditions are listed; a single agent can have more than one alert.</p></section>"
+                "<p class='muted'>Enforce konsolundaki Agent Overview ekranındaki uyarılara karşılık gelir (Not Reporting, Outdated, Active Directory çözümleme hatası vb.). Sadece normalin dışındaki (Kritik/Uyarı) durumlar listelenir; bir agent'ta birden fazla uyarı olabilir.</p></section>"
         }
         else {
-            $agentAlertHtml = "<section><h2>Agent Alerts</h2><div class='kpi-row'>$alertCards</div><p class='note-ok'>No agent has a critical or warning condition.</p></section>"
+            $agentAlertHtml = "<section><h2>Agent Uyarıları</h2><div class='kpi-row'>$alertCards</div><p class='note-ok'>Hiçbir agent'ta kritik veya uyarı seviyesinde bir durum bulunmamaktadır.</p></section>"
         }
     }
     else {
-        $agentAlertHtml = "<section><h2>Agent Alerts</h2><p class='muted'>Agent alert information could not be read.</p></section>"
+        $agentAlertHtml = "<section><h2>Agent Uyarıları</h2><p class='muted'>Agent uyarı bilgisi okunamadı.</p></section>"
     }
 }
 
@@ -751,36 +760,36 @@ if ($hasDb) {
     }
 
     if ($null -eq $totalIncidents) {
-        $totalIncidentSectionHtml = "<section><h2>Total Incident Count</h2><p class='muted'>The total incident count could not be read.</p></section>"
+        $totalIncidentSectionHtml = "<section><h2>Toplam Incident Sayısı</h2><p class='muted'>Toplam incident sayısı okunamadı.</p></section>"
     }
     else {
-        $tr = [System.Globalization.CultureInfo]::GetCultureInfo('en-US')
+        $tr = [System.Globalization.CultureInfo]::GetCultureInfo('tr-TR')
         $totalText = $totalIncidents.ToString('N0', $tr)
         if ($totalIncidents -gt $incidentLimit) {
             $noteClass = 'note-warn'
-            $noteText = "Your incident count ($totalText) is higher than the recommended 1 million incidents. This may affect system performance."
+            $noteText = "Incident değeriniz ($totalText) tavsiye edilen 1 milyon incident değerinden yüksektir. Bu durum performans açısından sisteminizi etkileyebilir."
             $totalColor = '#dc2626'
         }
         else {
             $noteClass = 'note-ok'
-            $noteText = "Your incident count ($totalText) has not reached the recommended limit of 1 million incidents."
+            $noteText = "Incident değeriniz ($totalText) tavsiye edilen 1 milyon incident sınır eşiğine gelmemiştir."
             $totalColor = '#16a34a'
         }
-        $pendingText = 'Could not be read'
+        $pendingText = 'Okunamadı'
         if ($db.PSObject.Properties['PendingDeleteStatus'] -and $db.PendingDeleteStatus -eq 'Successful') {
             $pendingText = ([long]$db.PendingDeleteCount).ToString('N0', $tr)
         }
-        $pendingCard = Get-KpiCardHtml -Label 'Incidents Pending Deletion (Marked)' -Value $pendingText -Color '#d97706'
-        $totalIncidentSectionHtml = "<section><h2>Total Incident Count</h2><div class='kpi-row'>$(Get-KpiCardHtml -Label 'Total Incidents in the Database' -Value $totalText -Color $totalColor)$pendingCard</div><p class='$noteClass'>$(ConvertTo-HtmlSafe $noteText)</p><p class='muted'>The total does not include incidents that are pending deletion (marked for deletion).</p></section>"
+        $pendingCard = Get-KpiCardHtml -Label 'Silinmeyi Bekleyen (İşaretli) Incident' -Value $pendingText -Color '#d97706'
+        $totalIncidentSectionHtml = "<section><h2>Toplam Incident Sayısı</h2><div class='kpi-row'>$(Get-KpiCardHtml -Label 'Veritabanındaki Toplam Incident' -Value $totalText -Color $totalColor)$pendingCard</div><p class='$noteClass'>$(ConvertTo-HtmlSafe $noteText)</p><p class='muted'>Toplam sayı, silinmeyi bekleyen (silinmek üzere işaretlenmiş) incident'ları içermez.</p></section>"
     }
 }
 
 $html = @"
 <!DOCTYPE html>
-<html lang="en">
+<html lang="tr">
 <head>
 <meta charset="utf-8">
-<title>DLP Health Check Report - $(ConvertTo-HtmlSafe $reportData.ComputerName)</title>
+<title>DLP Health Check Raporu - $(ConvertTo-HtmlSafe $reportData.ComputerName)</title>
 <style>
   :root { color-scheme: light; }
   * { box-sizing: border-box; }
@@ -846,48 +855,48 @@ $html = @"
 <div class="page">
 
   <div class="report-header">
-    <h1>DLP Health Check Report</h1>
-    <div class="sub">Customer: $(ConvertTo-HtmlSafe $CustomerName) &nbsp;|&nbsp; Server: $(ConvertTo-HtmlSafe $reportData.ComputerName) &nbsp;|&nbsp; Collected at: $(ConvertTo-HtmlSafe $reportData.CollectedAt)</div>
+    <h1>DLP Health Check Raporu</h1>
+    <div class="sub">Müşteri: $(ConvertTo-HtmlSafe $CustomerName) &nbsp;|&nbsp; Sunucu: $(ConvertTo-HtmlSafe $reportData.ComputerName) &nbsp;|&nbsp; Toplama tarihi: $(ConvertTo-HtmlSafe $reportData.CollectedAt)</div>
   </div>
 
   <section>
-    <h2>System Information</h2>
+    <h2>Sistem Bilgisi</h2>
     <div class="info-cards">
-      <div class="info-card"><div class="k">Manufacturer / Model</div><div class="v">$(ConvertTo-HtmlSafe $reportData.SystemInfo.Manufacturer) / $(ConvertTo-HtmlSafe $reportData.SystemInfo.Model)</div></div>
-      <div class="info-card"><div class="k">Operating System</div><div class="v">$(ConvertTo-HtmlSafe $reportData.SystemInfo.OperatingSystem)</div></div>
-      <div class="info-card"><div class="k">OS Version / Architecture</div><div class="v">$(ConvertTo-HtmlSafe $reportData.SystemInfo.OSVersion) / $(ConvertTo-HtmlSafe $reportData.SystemInfo.Architecture)</div></div>
-      <div class="info-card"><div class="k">Last Reboot</div><div class="v">$(ConvertTo-HtmlSafe $reportData.SystemInfo.LastBoot)</div></div>
-      <div class="info-card"><div class="k">Logical CPU / RAM</div><div class="v">$($reportData.Hardware.LogicalCpu) / $($reportData.Hardware.TotalMemoryGB) GB</div></div>
+      <div class="info-card"><div class="k">Üretici / Model</div><div class="v">$(ConvertTo-HtmlSafe $reportData.SystemInfo.Manufacturer) / $(ConvertTo-HtmlSafe $reportData.SystemInfo.Model)</div></div>
+      <div class="info-card"><div class="k">İşletim Sistemi</div><div class="v">$(ConvertTo-HtmlSafe $reportData.SystemInfo.OperatingSystem)</div></div>
+      <div class="info-card"><div class="k">OS Versiyonu / Mimari</div><div class="v">$(ConvertTo-HtmlSafe $reportData.SystemInfo.OSVersion) / $(ConvertTo-HtmlSafe $reportData.SystemInfo.Architecture)</div></div>
+      <div class="info-card"><div class="k">Son Yeniden Başlatma</div><div class="v">$(ConvertTo-HtmlSafe $reportData.SystemInfo.LastBoot)</div></div>
+      <div class="info-card"><div class="k">Mantıksal CPU / RAM</div><div class="v">$($reportData.Hardware.LogicalCpu) / $($reportData.Hardware.TotalMemoryGB) GB</div></div>
     </div>
   </section>
 
   <section>
-    <h2>Disk Usage</h2>
+    <h2>Disk Kullanımı</h2>
     $($diskRowsHtml.ToString())
   </section>
 
   $tierSectionHtml
 
   <section>
-    <h2>DLP Services</h2>
+    <h2>DLP Servisleri</h2>
     $(Get-GenericTableHtml -Items @($reportData.DlpServices) -Columns $dlpServiceColumns -RowColorSelector { param($i) if ($i.StartMode -eq 'Auto' -and $i.State -ne 'Running') { '#dc2626' } elseif ($i.State -eq 'Running') { '#16a34a' } else { $null } })
   </section>
 
   <section>
-    <h2>Overview</h2>
+    <h2>Genel Özet</h2>
     <div class="kpi-row">
-      $(Get-KpiCardHtml -Label 'Normal Findings' -Value $normalCount -Color '#16a34a')
-      $(Get-KpiCardHtml -Label 'Warning Findings' -Value $warningCount -Color '#d97706')
-      $(Get-KpiCardHtml -Label 'Critical Findings' -Value $criticalCount -Color '#dc2626')
-      $(Get-KpiCardHtml -Label 'Unknown Findings' -Value $unknownCount -Color '#6b7280')
-      $(Get-KpiCardHtml -Label 'Uptime (days)' -Value $reportData.SystemInfo.UptimeDays)
-      $(Get-KpiCardHtml -Label 'Average CPU %' -Value $(if($null -ne $cpuVal){"$cpuVal%"}else{'N/A'}) -Color $cpuColor)
-      $(Get-KpiCardHtml -Label 'Memory Usage %' -Value "$memVal%" -Color $memColor)
+      $(Get-KpiCardHtml -Label 'Normal Bulgu' -Value $normalCount -Color '#16a34a')
+      $(Get-KpiCardHtml -Label 'Uyarı Bulgusu' -Value $warningCount -Color '#d97706')
+      $(Get-KpiCardHtml -Label 'Kritik Bulgu' -Value $criticalCount -Color '#dc2626')
+      $(Get-KpiCardHtml -Label 'Bilinmeyen Bulgu' -Value $unknownCount -Color '#6b7280')
+      $(Get-KpiCardHtml -Label 'Uptime (gün)' -Value $reportData.SystemInfo.UptimeDays)
+      $(Get-KpiCardHtml -Label 'CPU Ortalama %' -Value $(if($null -ne $cpuVal){"$cpuVal%"}else{'N/A'}) -Color $cpuColor)
+      $(Get-KpiCardHtml -Label 'Bellek Kullanımı %' -Value "$memVal%" -Color $memColor)
     </div>
   </section>
 
   <section>
-    <h2>Health Findings</h2>
+    <h2>Sağlık Bulguları</h2>
     $(Get-FindingsTableHtml -Findings $findings)
   </section>
 
@@ -895,19 +904,19 @@ $(
 if ($hasDb) {
 @"
   <section>
-    <h2>Oracle Connection / DLP System Information</h2>
+    <h2>Oracle Bağlantısı / DLP Sistem Bilgisi</h2>
     <div class="info-cards">
-      <div class="info-card"><div class="k">DB Login</div><div class="v">$(ConvertTo-HtmlSafe $db.DatabaseLogin)</div></div>
-      <div class="info-card"><div class="k">Database / User</div><div class="v">$(ConvertTo-HtmlSafe $db.DatabaseName) / $(ConvertTo-HtmlSafe $db.ConnectedUser)</div></div>
-      <div class="info-card"><div class="k">DLP Version</div><div class="v">$(ConvertTo-HtmlSafe $db.DlpVersion)</div></div>
-      <div class="info-card"><div class="k">Schema Version</div><div class="v">$(ConvertTo-HtmlSafe $db.DlpSchemaVersion)</div></div>
-      <div class="info-card"><div class="k">Installation Date</div><div class="v">$(ConvertTo-HtmlSafe $db.DlpInstalledAt)</div></div>
+      <div class="info-card"><div class="k">DB Girişi</div><div class="v">$(ConvertTo-HtmlSafe $db.DatabaseLogin)</div></div>
+      <div class="info-card"><div class="k">Veritabanı / Kullanıcı</div><div class="v">$(ConvertTo-HtmlSafe $db.DatabaseName) / $(ConvertTo-HtmlSafe $db.ConnectedUser)</div></div>
+      <div class="info-card"><div class="k">DLP Versiyonu</div><div class="v">$(ConvertTo-HtmlSafe $db.DlpVersion)</div></div>
+      <div class="info-card"><div class="k">Şema Versiyonu</div><div class="v">$(ConvertTo-HtmlSafe $db.DlpSchemaVersion)</div></div>
+      <div class="info-card"><div class="k">Kurulum Tarihi</div><div class="v">$(ConvertTo-HtmlSafe $db.DlpInstalledAt)</div></div>
     </div>
     $licenseSectionHtml
   </section>
 
   <section>
-    <h2>Agent Version Distribution</h2>
+    <h2>Agent Versiyon Dağılımı</h2>
     $(Get-BarRowsHtml -Items @($db.AgentVersions) -LabelProperty 'Version' -ValueProperty 'Count' -BarColor '#2563eb')
     <div class="agent-counts">
       <div>Agent Install : $(ConvertTo-HtmlSafe ([string]$db.InstallAgentCount))</div>
@@ -921,34 +930,34 @@ if ($hasDb) {
   $agentAlertHtml
 
   <section>
-    <h2>Detection Servers and Channels</h2>
+    <h2>Detection Server ve Kanal Bilgileri</h2>
     $(Get-GenericTableHtml -Items $detectionServerItems -Columns $detectionServerColumns -RowColorSelector { param($i) if ($i.StatusDisplay -eq 'Running') { '#16a34a' } else { '#d97706' } })
-    <p style="margin:12px 0 4px 0;font-size:14px"><strong>Total Detection Servers: $detectionServerCount</strong> <span class="muted">(A server can run more than one channel, so the table has one row per channel.)</span></p>
-    <p style="margin:6px 0"><span class="badge" style="background:#16a34a">Running: $serverRunningCount</span> <span class="badge" style="background:#d97706">Unknown: $serverUnknownCount</span> <span class="muted">Servers that stop sending heartbeats are counted as Unknown, as in the Enforce console; a Stopped state cannot be detected separately from heartbeats.</span></p>
-    <p class="muted">The status is calculated from the last heartbeat the server reported to Enforce: Running if a heartbeat arrived within the last $heartbeatMinutes minutes, Unknown if heartbeats stopped or no record exists (the Enforce console also shows Unknown in this case). A lost heartbeat does not distinguish between a stopped server and an unreachable one.</p>
+    <p style="margin:12px 0 4px 0;font-size:14px"><strong>Toplam Detection Server sayısı: $detectionServerCount</strong> <span class="muted">(Bir sunucu birden fazla kanal çalıştırabildiği için tabloda kanal başına bir satır bulunur.)</span></p>
+    <p style="margin:6px 0"><span class="badge" style="background:#16a34a">Running: $serverRunningCount</span> <span class="badge" style="background:#d97706">Unknown: $serverUnknownCount</span> <span class="muted">Sinyali kesilen sunucular Enforce konsolundaki gibi Unknown sayılır; Stopped durumu heartbeat'ten ayrıca tespit edilemez.</span></p>
+    <p class="muted">Durum, sunucunun Enforce'a bildirdiği son heartbeat zamanına göre hesaplanır: son $heartbeatMinutes dakika içinde sinyal varsa Running, sinyal kesilmişse veya kayıt yoksa Unknown (Enforce konsolu da bu durumda Unknown gösterir). Sinyal kesilmesi, sunucunun kapalı mı yoksa erişilemez mi olduğunu ayırt etmez.</p>
   </section>
 
   <section>
-    <h2>Detection Server Error and Warning Events (Last $eventDays Days)</h2>
+    <h2>Detection Server Hata ve Uyarı Olayları (Son $eventDays Gün)</h2>
     $eventCoverageHtml
     $eventTableHtml
-    <p class="muted">The same event code is grouped into one row per server; "Count" shows the number of occurrences in this period and "Last Time" the most recent occurrence.</p>
+    <p class="muted">Aynı olay kodu, sunucu bazında tek satırda toplanır; "Adet" bu dönemdeki tekrar sayısını, "Son Zaman" en son oluşma zamanını gösterir.</p>
   </section>
 
   <section>
-    <h2>Oracle Database Information</h2>
+    <h2>Oracle Veritabanı Bilgisi</h2>
     <div class="info-cards">
-      <div class="info-card"><div class="k">Oracle Version</div><div class="v">$(ConvertTo-HtmlSafe $db.OracleVersion)</div></div>
-      <div class="info-card"><div class="k">Server Name</div><div class="v">$(ConvertTo-HtmlSafe $db.OracleHostName)</div></div>
+      <div class="info-card"><div class="k">Oracle Versiyonu</div><div class="v">$(ConvertTo-HtmlSafe $db.OracleVersion)</div></div>
+      <div class="info-card"><div class="k">Sunucu Adı</div><div class="v">$(ConvertTo-HtmlSafe $db.OracleHostName)</div></div>
       <div class="info-card"><div class="k">Instance</div><div class="v">$(ConvertTo-HtmlSafe $db.OracleInstanceName)</div></div>
-      <div class="info-card"><div class="k">Instance Start Time</div><div class="v">$(ConvertTo-HtmlSafe $db.OracleInstanceStartTime)</div></div>
+      <div class="info-card"><div class="k">Instance Başlangıç Zamanı</div><div class="v">$(ConvertTo-HtmlSafe $db.OracleInstanceStartTime)</div></div>
       $oracleRuCardsHtml
     </div>
     $oraclePatchHtml
   </section>
 
   <section>
-    <h2>Oracle Tablespace Usage</h2>
+    <h2>Oracle Tablespace Kullanımı</h2>
     $($tablespaceHtml.ToString())
   </section>
 
@@ -956,11 +965,11 @@ if ($hasDb) {
 
   <div class="grid-2">
     <section>
-      <h2>Incident Type Distribution</h2>
+      <h2>Incident Tür Dağılımı</h2>
       $(Get-BarRowsHtml -Items @($db.IncidentsByType) -LabelProperty 'Type' -ValueProperty 'Count' -BarColor '#7c3aed')
     </section>
     <section>
-      <h2>Incidents by Detection Server</h2>
+      <h2>Detection Server Bazında Incident Dağılımı</h2>
       $(Get-BarRowsHtml -Items @($db.IncidentsByServer) -LabelProperty 'ServerName' -ValueProperty 'Count' -BarColor '#0891b2')
     </section>
   </div>
@@ -968,17 +977,17 @@ if ($hasDb) {
   $policySummaryHtml
 
   <section>
-    <h2>Most Violated Policies (Last $incidentDays Days)</h2>
+    <h2>En Çok İhlal Edilen Politikalar (Son $incidentDays Gün)</h2>
     $(Get-BarRowsHtml -Items @($db.TopPolicies) -LabelProperty 'PolicyName' -ValueProperty 'Count' -BarColor '#db2777' -MaxRows 10)
   </section>
 
   <div class="grid-2">
     <section>
-      <h2>Network - Top Incident-Generating Senders (Last $incidentDays Days)</h2>
+      <h2>Network - En Çok Incident Üreten Göndericiler (Son $incidentDays Gün)</h2>
       $(Get-BarRowsHtml -Items @($db.TopNetworkSenders) -LabelProperty 'Sender' -ValueProperty 'Count' -BarColor '#ea580c' -MaxRows 10)
     </section>
     <section>
-      <h2>Endpoint - Top Incident-Generating Users (Last $incidentDays Days)</h2>
+      <h2>Endpoint - En Çok Incident Üreten Kullanıcılar (Son $incidentDays Gün)</h2>
       $(Get-BarRowsHtml -Items @($db.TopEndpointUsers) -LabelProperty 'UserName' -ValueProperty 'Count' -BarColor '#16a34a' -MaxRows 10)
     </section>
   </div>
@@ -991,11 +1000,11 @@ if ($hasDb) {
 "@
 }
 else {
-  "<section><h2>Oracle / Database</h2><p class='muted'>The database check was skipped in this run (-SkipDatabaseCheck).$(if ($licenseSectionHtml) { '</p>' + $licenseSectionHtml } else { '</p>' })</section>$syslogStandaloneHtml"
+  "<section><h2>Oracle / Veritabanı</h2><p class='muted'>Bu çalıştırmada veritabanı kontrolü atlanmış (-SkipDatabaseCheck).$(if ($licenseSectionHtml) { '</p>' + $licenseSectionHtml } else { '</p>' })</section>$syslogStandaloneHtml"
 }
 )
 
-  <footer>Report generated on $generatedAt by the DLP Health Check script. This report contains data collected in read-only mode; no change was made to the system.<br><strong>FIRAT AYDIN</strong></footer>
+  <footer>Rapor $generatedAt tarihinde DLP Health Check scripti ile üretilmiştir. Bu rapor sadece okuma amaçlı toplanan verileri içerir, sistemde herhangi bir değişiklik yapılmamıştır.<br><strong>FIRAT AYDIN</strong></footer>
 </div>
 </body>
 </html>
@@ -2034,7 +2043,7 @@ SPOOL OFF
 SPOOL $incidentServerFile
 SELECT
     REPLACE(NVL(im.monitorname, 'Unknown'), '|', '/') ||
-    CASE WHEN NVL(im.isdeleted, 0) = 1 THEN ' (deleted/inactive server record)' ELSE '' END ||
+    CASE WHEN NVL(im.isdeleted, 0) = 1 THEN ' (silinmis/pasif sunucu kaydi)' ELSE '' END ||
     '|' || COUNT(*)
 FROM incident i
 JOIN message m ON m.messageid = i.messageid
@@ -2172,7 +2181,8 @@ FROM dual;
 SPOOL OFF
 
 SPOOL $patternListFile
-SELECT status_flag || '|' || REPLACE(pattern_name, '|', '/') || '|' || user_entries || '|' || ip_entries || '|' || url_entries || '|' || modified_text || '|' || rule_type
+SELECT status_flag || '|' || REPLACE(pattern_name, '|', '/') || '|' || user_entries || '|' || ip_entries || '|' || url_entries || '|' || modified_text || '|' || rule_type || '|' ||
+    user_detail || '|' || user_trunc || '|' || ip_detail || '|' || ip_trunc || '|' || url_detail || '|' || url_trunc
 FROM (
     SELECT
         CASE WHEN NVL(isdeleted, 0) = 0 THEN 'A' ELSE 'D' END AS status_flag,
@@ -2182,6 +2192,12 @@ FROM (
         NVL(REGEXP_COUNT(urldomains, '[^,[:space:]]+'), 0) AS url_entries,
         NVL(TO_CHAR(modifieddate, 'YYYY-MM-DD HH24:MI'), '-') AS modified_text,
         NVL(ruletype, -1) AS rule_type,
+        REPLACE(REPLACE(REPLACE(NVL(DBMS_LOB.SUBSTR(userpatterns, 4000, 1), '-'), CHR(10), ' '), CHR(13), ' '), '|', '/') AS user_detail,
+        CASE WHEN NVL(DBMS_LOB.GETLENGTH(userpatterns), 0) > 4000 THEN 'Y' ELSE 'N' END AS user_trunc,
+        REPLACE(REPLACE(REPLACE(NVL(DBMS_LOB.SUBSTR(ipaddresses, 4000, 1), '-'), CHR(10), ' '), CHR(13), ' '), '|', '/') AS ip_detail,
+        CASE WHEN NVL(DBMS_LOB.GETLENGTH(ipaddresses), 0) > 4000 THEN 'Y' ELSE 'N' END AS ip_trunc,
+        REPLACE(REPLACE(REPLACE(NVL(DBMS_LOB.SUBSTR(urldomains, 4000, 1), '-'), CHR(10), ' '), CHR(13), ' '), '|', '/') AS url_detail,
+        CASE WHEN NVL(DBMS_LOB.GETLENGTH(urldomains), 0) > 4000 THEN 'Y' ELSE 'N' END AS url_trunc,
         ROW_NUMBER() OVER (PARTITION BY CASE WHEN NVL(isdeleted, 0) = 0 THEN 'A' ELSE 'D' END ORDER BY name) AS rn
     FROM senderrecipientpattern
     WHERE name IS NOT NULL
@@ -2349,8 +2365,8 @@ EXIT SUCCESS
         Write-Host "Database Service : $ServiceName"
         Write-Host "Database User    : $UserName"
         Write-Host ''
-        Write-Host 'PowerShell will ask for the Oracle password.' -ForegroundColor Yellow
-        Write-Host 'The password is masked while you type it.' -ForegroundColor Yellow
+        Write-Host 'PowerShell Oracle parolasini isteyecek.' -ForegroundColor Yellow
+        Write-Host 'Parolayi yazarken giris maskeli olarak gosterilir.' -ForegroundColor Yellow
         Write-Host "SQL file: $sqlFile" -ForegroundColor DarkGray
         Write-Host ''
 
@@ -2903,7 +2919,7 @@ EXIT SUCCESS
                 foreach ($patternLine in (Get-Content -LiteralPath $patternListFile -ErrorAction SilentlyContinue)) {
                     if ($patternLine -match 'ORA-\d+') { continue }
                     $patternParts = $patternLine.Trim() -split '\|'
-                    if ($patternParts.Count -eq 7 -and $patternParts[0] -match '^[AD]$' -and
+                    if ($patternParts.Count -eq 13 -and $patternParts[0] -match '^[AD]$' -and
                         $patternParts[2] -match '^\d+$' -and $patternParts[3] -match '^\d+$' -and $patternParts[4] -match '^\d+$' -and
                         $patternParts[6].Trim() -match '^-?\d+$') {
                         $patternTypeId = [int]$patternParts[6].Trim()
@@ -2913,12 +2929,18 @@ EXIT SUCCESS
                             default { "Tip $patternTypeId" }
                         }
                         $patternItem = [pscustomobject]@{
-                            PatternName = $patternParts[1].Trim()
-                            PatternType = $patternTypeLabel
-                            UserEntries = [int]$patternParts[2]
-                            IpEntries   = [int]$patternParts[3]
-                            UrlEntries  = [int]$patternParts[4]
-                            Modified    = $patternParts[5].Trim()
+                            PatternName    = $patternParts[1].Trim()
+                            PatternType    = $patternTypeLabel
+                            UserEntries    = [int]$patternParts[2]
+                            IpEntries      = [int]$patternParts[3]
+                            UrlEntries     = [int]$patternParts[4]
+                            Modified       = $patternParts[5].Trim()
+                            UserDetail     = $patternParts[7].Trim()
+                            UserTruncated  = ($patternParts[8].Trim() -eq 'Y')
+                            IpDetail       = $patternParts[9].Trim()
+                            IpTruncated    = ($patternParts[10].Trim() -eq 'Y')
+                            UrlDetail      = $patternParts[11].Trim()
+                            UrlTruncated   = ($patternParts[12].Trim() -eq 'Y')
                         }
                         if ($patternParts[0] -eq 'A') { [void]$patternsActive.Add($patternItem) }
                     }
@@ -3161,12 +3183,12 @@ Write-Host ' DLP Health Check' -ForegroundColor White
 Write-Host ' FIRAT AYDIN' -ForegroundColor Cyan
 Write-Host '============================================================' -ForegroundColor DarkCyan
 Write-Host ''
-Write-Host 'A DLP installation can be one of two types: Two-tier (the Enforce Server and the Oracle database on the SAME server) or Three-tier (the Enforce Server and the Oracle database on SEPARATE servers).' -ForegroundColor Gray
-Write-Host 'The health check evaluates the hardware recommendations according to the deployment type you select.' -ForegroundColor Gray
+Write-Host 'DLP kurulumu iki tipte olabilir: Two-tier (Enforce Server ve Oracle veritabani AYNI sunucuda) veya Three-tier (Enforce Server ve Oracle veritabani AYRI sunucularda).' -ForegroundColor Gray
+Write-Host 'Saglik kontrolu, donanim onerilerini sectiginiz kurulum tipine gore degerlendirir.' -ForegroundColor Gray
 Write-Host ''
 
 if ([string]::IsNullOrWhiteSpace($CustomerName)) {
-    $enteredCustomerName = Read-Host -Prompt 'Customer name (for the report title, may be left empty)'
+    $enteredCustomerName = Read-Host -Prompt 'Musteri adi (rapor basligi icin, bos birakilabilir)'
     if (-not [string]::IsNullOrWhiteSpace($enteredCustomerName)) {
         $CustomerName = $enteredCustomerName.Trim()
     }
@@ -3174,17 +3196,17 @@ if ([string]::IsNullOrWhiteSpace($CustomerName)) {
 }
 
 if ([string]::IsNullOrWhiteSpace($DeploymentTier)) {
-    Write-Host 'Which deployment type is your system?' -ForegroundColor White
-    Write-Host '  [2] Two-tier   (Enforce Server + Oracle on the same server)'
-    Write-Host '  [3] Three-tier (Enforce Server and Oracle on separate servers)'
-    Write-Host '  [B] I do not know (detected automatically)'
+    Write-Host 'Sisteminiz hangi kurulum tipinde?' -ForegroundColor White
+    Write-Host '  [2] Two-tier   (Enforce Server + Oracle ayni sunucuda)'
+    Write-Host '  [3] Three-tier (Enforce Server ve Oracle ayri sunucularda)'
+    Write-Host '  [B] Bilmiyorum (otomatik tespit edilir)'
     while ([string]::IsNullOrWhiteSpace($DeploymentTier)) {
-        $tierAnswer = (Read-Host -Prompt 'Your choice (2 / 3 / B)').Trim().ToLowerInvariant()
+        $tierAnswer = (Read-Host -Prompt 'Seciminiz (2 / 3 / B)').Trim().ToLowerInvariant()
         switch -Regex ($tierAnswer) {
             '^(2|two|two-tier|twotier)$'         { $DeploymentTier = 'TwoTier' }
             '^(3|three|three-tier|threetier)$'   { $DeploymentTier = 'ThreeTier' }
-            '^(b|unknown|dont know|do not know)$'           { $DeploymentTier = 'Unknown' }
-            default { Write-Host 'Invalid choice. Please enter 2, 3 or B.' -ForegroundColor Yellow }
+            '^(b|bilmiyorum|unknown)$'           { $DeploymentTier = 'Unknown' }
+            default { Write-Host 'Gecersiz secim. Lutfen 2, 3 veya B girin.' -ForegroundColor Yellow }
         }
     }
     Write-Host ''
@@ -3337,7 +3359,7 @@ catch {
 
 if (-not $SkipDatabaseCheck) {
     Write-Host '=== ORACLE CONNECTION INFORMATION ===' -ForegroundColor Cyan
-    Write-Host 'For fields left empty, the default value in brackets is used.' -ForegroundColor DarkGray
+    Write-Host 'Bos birakilan alanlarda parantez icindeki varsayilan deger kullanilir.' -ForegroundColor DarkGray
     Write-Host ''
 
     $enteredDatabaseHost = Read-Host -Prompt "Oracle IP or Host [$DatabaseHost]"
@@ -3714,23 +3736,23 @@ elseif ($databaseCheck) {
         if ($databaseCheck.IncidentTypeStatus -eq 'Successful') {
             $consoleTotalIncidents = [long](Get-SumOrZero -InputObject @($databaseCheck.IncidentsByType) -Property 'Count')
         }
-        $consoleTotalText = $consoleTotalIncidents.ToString('N0', [System.Globalization.CultureInfo]::GetCultureInfo('en-US'))
+        $consoleTotalText = $consoleTotalIncidents.ToString('N0', [System.Globalization.CultureInfo]::GetCultureInfo('tr-TR'))
         Write-Host ("TotalIncidentCount : {0}" -f $consoleTotalText) -ForegroundColor Cyan
         if ($databaseCheck.PendingDeleteStatus -eq 'Successful') {
-            Write-Host ("PendingDeleteCount : {0} (pending deletion, not included in the total)" -f ([long]$databaseCheck.PendingDeleteCount).ToString('N0', [System.Globalization.CultureInfo]::GetCultureInfo('en-US'))) -ForegroundColor Yellow
+            Write-Host ("PendingDeleteCount : {0} (silinmeyi bekleyen, toplama dahil degil)" -f ([long]$databaseCheck.PendingDeleteCount).ToString('N0', [System.Globalization.CultureInfo]::GetCultureInfo('tr-TR'))) -ForegroundColor Yellow
         }
         else {
-            Write-Host 'PendingDeleteCount : could not be read' -ForegroundColor DarkYellow
+            Write-Host 'PendingDeleteCount : okunamadi' -ForegroundColor DarkYellow
         }
         if ($consoleTotalIncidents -gt 1000000) {
-            Write-Host ("Your incident count ({0}) is higher than the recommended 1 million incidents. This may affect system performance." -f $consoleTotalText) -ForegroundColor Red
+            Write-Host ("Incident degeriniz ({0}) tavsiye edilen 1 milyon incident degerinden yuksektir. Bu durum performans acisindan sisteminizi etkileyebilir." -f $consoleTotalText) -ForegroundColor Red
         }
         else {
-            Write-Host ("Your incident count ({0}) has not reached the recommended limit of 1 million incidents." -f $consoleTotalText) -ForegroundColor Green
+            Write-Host ("Incident degeriniz ({0}) tavsiye edilen 1 milyon incident sinir esigine gelmemistir." -f $consoleTotalText) -ForegroundColor Green
         }
     }
     else {
-        Write-Host 'The total incident count could not be read.' -ForegroundColor Red
+        Write-Host 'Toplam incident sayisi okunamadi.' -ForegroundColor Red
     }
 
     Write-Section -Title 'INCIDENT TYPE DISTRIBUTION'
@@ -3740,10 +3762,10 @@ elseif ($databaseCheck) {
         Write-Host ("TotalIncidentCount : {0}" -f $totalIncidentCount) -ForegroundColor Cyan
     }
     elseif ($databaseCheck.IncidentTypeStatus -eq 'No incidents') {
-        Write-Host 'No recorded (non-deleted) incidents were found.' -ForegroundColor DarkYellow
+        Write-Host 'Kayitli (silinmemis) incident bulunamadi.' -ForegroundColor DarkYellow
     }
     else {
-        Write-Host ("The incident type distribution could not be read: {0}" -f $databaseCheck.IncidentTypeError) -ForegroundColor Red
+        Write-Host ("Incident turu dagilimi okunamadi: {0}" -f $databaseCheck.IncidentTypeError) -ForegroundColor Red
     }
 
     Write-Section -Title 'INCIDENTS BY DETECTION SERVER'
@@ -3751,10 +3773,10 @@ elseif ($databaseCheck) {
         $databaseCheck.IncidentsByServer | Select-Object ServerName, Count | Format-Table -AutoSize | Out-Host
     }
     elseif ($databaseCheck.IncidentServerStatus -eq 'No incidents') {
-        Write-Host 'No incidents were found per server.' -ForegroundColor DarkYellow
+        Write-Host 'Sunucu bazinda incident bulunamadi.' -ForegroundColor DarkYellow
     }
     else {
-        Write-Host ("The per-server incident distribution could not be read: {0}" -f $databaseCheck.IncidentServerError) -ForegroundColor Red
+        Write-Host ("Sunucu bazinda incident dagilimi okunamadi: {0}" -f $databaseCheck.IncidentServerError) -ForegroundColor Red
     }
 
     Write-Section -Title 'POLICY SUMMARY'
@@ -3778,10 +3800,10 @@ elseif ($databaseCheck) {
         $databaseCheck.TopPolicies | Select-Object PolicyName, Count | Format-Table -AutoSize | Out-Host
     }
     elseif ($databaseCheck.TopPolicyStatus -eq 'No incidents') {
-        Write-Host ("No policy violations were found in the last {0} days." -f $IncidentLookbackDays) -ForegroundColor DarkYellow
+        Write-Host ("Son {0} gunde politika ihlali bulunamadi." -f $IncidentLookbackDays) -ForegroundColor DarkYellow
     }
     else {
-        Write-Host ("The most violated policies could not be read: {0}" -f $databaseCheck.TopPolicyError) -ForegroundColor Red
+        Write-Host ("En cok ihlal edilen politikalar okunamadi: {0}" -f $databaseCheck.TopPolicyError) -ForegroundColor Red
     }
 
     Write-Section -Title ("NETWORK - TOP INCIDENT-GENERATING SENDERS (Last {0} days, Top {1})" -f $IncidentLookbackDays, $IncidentTopCount)
@@ -3789,10 +3811,10 @@ elseif ($databaseCheck) {
         $databaseCheck.TopNetworkSenders | Select-Object Sender, Count | Format-Table -AutoSize | Out-Host
     }
     elseif ($databaseCheck.NetworkSenderStatus -eq 'No incidents') {
-        Write-Host ("No network incidents were found in the last {0} days." -f $IncidentLookbackDays) -ForegroundColor DarkYellow
+        Write-Host ("Son {0} gunde network incident'i bulunamadi." -f $IncidentLookbackDays) -ForegroundColor DarkYellow
     }
     else {
-        Write-Host ("The network sender distribution could not be read: {0}" -f $databaseCheck.NetworkSenderError) -ForegroundColor Red
+        Write-Host ("Network gonderen dagilimi okunamadi: {0}" -f $databaseCheck.NetworkSenderError) -ForegroundColor Red
     }
 
     Write-Section -Title ("ENDPOINT - TOP INCIDENT-GENERATING USERS (Last {0} days, Top {1})" -f $IncidentLookbackDays, $IncidentTopCount)
@@ -3800,10 +3822,10 @@ elseif ($databaseCheck) {
         $databaseCheck.TopEndpointUsers | Select-Object UserName, Count | Format-Table -AutoSize | Out-Host
     }
     elseif ($databaseCheck.EndpointUserStatus -eq 'No incidents') {
-        Write-Host ("No endpoint incidents were found in the last {0} days." -f $IncidentLookbackDays) -ForegroundColor DarkYellow
+        Write-Host ("Son {0} gunde endpoint incident'i bulunamadi." -f $IncidentLookbackDays) -ForegroundColor DarkYellow
     }
     else {
-        Write-Host ("The endpoint user distribution could not be read: {0}" -f $databaseCheck.EndpointUserError) -ForegroundColor Red
+        Write-Host ("Endpoint kullanici dagilimi okunamadi: {0}" -f $databaseCheck.EndpointUserError) -ForegroundColor Red
     }
 
     Write-Section -Title 'SENDER/RECIPIENT PATTERN SUMMARY'
@@ -4025,7 +4047,7 @@ try {
     Set-Content -Path $reportPath -Value $htmlContent -Encoding UTF8 -Force
 
     Write-Host ''
-    Write-Host "HTML report created: $reportPath" -ForegroundColor Green
+    Write-Host "HTML rapor olusturuldu: $reportPath" -ForegroundColor Green
 
     try {
         $pdfBrowserPath = Get-DlpHeadlessBrowserPath
@@ -4033,21 +4055,21 @@ try {
             $pdfHtmlContent = New-DlpHtmlReport -ReportData $reportForHtml -CustomerName $CustomerName -OmitAgentDetailList
             $pdfPath = [System.IO.Path]::ChangeExtension($reportPath, 'pdf')
             if (New-DlpPdfReport -BrowserPath $pdfBrowserPath -HtmlContent $pdfHtmlContent -PdfOutputPath $pdfPath) {
-                Write-Host "PDF report created: $pdfPath" -ForegroundColor Green
+                Write-Host "PDF rapor olusturuldu: $pdfPath" -ForegroundColor Green
             }
             else {
-                Write-Host 'The PDF report could not be created (conversion failed). The HTML report is still available.' -ForegroundColor DarkYellow
+                Write-Host 'PDF rapor olusturulamadi (donusturme basarisiz oldu). HTML rapor kullanilabilir.' -ForegroundColor DarkYellow
             }
         }
         else {
-            Write-Host 'The PDF report could not be created: Microsoft Edge or Google Chrome was not found on this system. The HTML report is still available.' -ForegroundColor DarkYellow
+            Write-Host 'PDF rapor olusturulamadi: sistemde Microsoft Edge veya Google Chrome bulunamadi. HTML rapor kullanilabilir.' -ForegroundColor DarkYellow
         }
     }
     catch {
-        Write-Host "The PDF report could not be created: $($_.Exception.Message)" -ForegroundColor DarkYellow
+        Write-Host "PDF rapor olusturulamadi: $($_.Exception.Message)" -ForegroundColor DarkYellow
     }
 }
 catch {
     Write-Host ''
-    Write-Host "The HTML report could not be created: $($_.Exception.Message)" -ForegroundColor Red
+    Write-Host "HTML rapor olusturulamadi: $($_.Exception.Message)" -ForegroundColor Red
 }
