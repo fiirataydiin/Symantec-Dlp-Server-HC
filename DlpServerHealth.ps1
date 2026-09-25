@@ -418,6 +418,8 @@ if ($hasDb) {
         $unusedCount = [int]$db.UnusedPolicyCount
         $policyCards = (Get-KpiCardHtml -Label 'Toplam Politika' -Value ([string]$db.PolicyTotalCount)) +
             (Get-KpiCardHtml -Label 'Toplam Politika Grubu' -Value ([string]$db.PolicyGroupCount)) +
+            (Get-KpiCardHtml -Label 'Aktif Politika' -Value ([string]$db.PolicyActiveCount) -Color '#16a34a') +
+            (Get-KpiCardHtml -Label 'Pasif Politika' -Value ([string]$db.PolicyPassiveCount) -Color '#6b7280') +
             (Get-KpiCardHtml -Label "Son $lookbackDays günde incident üretmeyen politika" -Value ([string]$unusedCount) -Color $(if ($unusedCount -gt 0) { '#d97706' } else { '#16a34a' }))
         $policyNote = if ($unusedCount -gt 0) {
             "<p class='note-warn'>Son $lookbackDays günde hiç incident üretmeyen $unusedCount politika bulunmaktadır. Bu politikaların gözden geçirilmesi (pasif, gereksiz veya hiç tetiklenmeyen kurallar olabilir) önerilir.</p>"
@@ -1707,6 +1709,8 @@ function Invoke-DlpDatabaseCheck {
         PolicyTotalCount    = 'N/A'
         PolicyGroupCount    = 'N/A'
         UnusedPolicyCount   = 'N/A'
+        PolicyActiveCount   = 'N/A'
+        PolicyPassiveCount  = 'N/A'
         PolicySummaryError  = $null
         UnusedPolicies      = @()
         PatternSummaryStatus = 'Not tested'
@@ -2152,7 +2156,9 @@ SELECT
             SELECT 1 FROM incident i
             WHERE i.policyid = p.policyid
               AND i.isdeleted = 0
-              AND i.creationdate >= SYSTIMESTAMP - NUMTODSINTERVAL($IncidentLookbackDays, 'DAY')))
+              AND i.creationdate >= SYSTIMESTAMP - NUMTODSINTERVAL($IncidentLookbackDays, 'DAY'))) || '|' ||
+    (SELECT COUNT(*) FROM policy WHERE NVL(isdeleted, 0) = 0 AND activestatus = 1) || '|' ||
+    (SELECT COUNT(*) FROM policy WHERE NVL(isdeleted, 0) = 0 AND NVL(activestatus, 0) <> 1)
 FROM dual;
 SPOOL OFF
 
@@ -2868,12 +2874,14 @@ EXIT SUCCESS
 
             if (Test-Path -LiteralPath $policySummaryFile) {
                 $policySummaryLines = @(Get-Content -LiteralPath $policySummaryFile -ErrorAction SilentlyContinue)
-                $policySummaryLine = $policySummaryLines | Where-Object { $_.Trim() -match '^\d+\|\d+\|\d+$' } | Select-Object -First 1
+                $policySummaryLine = $policySummaryLines | Where-Object { $_.Trim() -match '^\d+\|\d+\|\d+\|\d+\|\d+$' } | Select-Object -First 1
                 if ($null -ne $policySummaryLine) {
                     $policySummaryParts = $policySummaryLine.Trim() -split '\|'
                     $result.PolicyTotalCount = $policySummaryParts[0]
                     $result.PolicyGroupCount = $policySummaryParts[1]
                     $result.UnusedPolicyCount = $policySummaryParts[2]
+                    $result.PolicyActiveCount = $policySummaryParts[3]
+                    $result.PolicyPassiveCount = $policySummaryParts[4]
                     $result.PolicySummaryStatus = 'Successful'
                 }
                 else {
@@ -3783,6 +3791,8 @@ elseif ($databaseCheck) {
     if ($databaseCheck.PolicySummaryStatus -eq 'Successful') {
         Write-Host ("TotalPolicyCount        : {0}" -f $databaseCheck.PolicyTotalCount) -ForegroundColor Cyan
         Write-Host ("TotalPolicyGroupCount   : {0}" -f $databaseCheck.PolicyGroupCount) -ForegroundColor Cyan
+        Write-Host ("ActivePolicyCount       : {0}" -f $databaseCheck.PolicyActiveCount) -ForegroundColor Cyan
+        Write-Host ("PassivePolicyCount      : {0}" -f $databaseCheck.PolicyPassiveCount) -ForegroundColor Cyan
         Write-Host ("Policies without incident in last {0} days : {1}" -f $IncidentLookbackDays, $databaseCheck.UnusedPolicyCount) -ForegroundColor $(if ([int]$databaseCheck.UnusedPolicyCount -gt 0) { 'Yellow' } else { 'Green' })
         if (@($databaseCheck.UnusedPolicies).Count -gt 0) {
             $databaseCheck.UnusedPolicies | Select-Object PolicyName, PolicyGroup | Format-Table -AutoSize | Out-Host
